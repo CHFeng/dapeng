@@ -26,31 +26,26 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-@app.get("/")  # 指定 api 路徑 (get方法)
+@app.get("/")  # 回傳此服務的版本號碼
 def check_health():
     return "The Service works fine, Version:{}".format(APP_VERSION)
 
 
-@app.get("/check_nvr")
+@app.get("/check_nvr")  # 檢查與NVR影像主機間的通訊是否正常
 def check_nvr():
     return {"Status": "OK"}
 
 
-@app.get("/check_ai_model")
+@app.get("/check_ai_model")  # 檢查與NVR影像主機間的通訊是否正常
 def check_ai_model():
     return {"Status": "OK"}
 
 
-@app.get("/object_counter")
-def get_object_counter(cam_id: str, date: str, time: str):
-    print(cam_id, date, time)
+@app.get("/object_counter")  # 指定影像來源、日期與時間參數下的物件辨識統計資料
+def get_object_counter(cam_id: str, date: str, start_time: str, end_time: str):
+    print(cam_id, date, start_time, end_time)
     data = {
         "Big Car": 10,
         "Small Car": 50
     }
     return data
-
-
-@app.get("/users/{user_id}")  # 指定 api 路徑 (get方法)
-def read_user(user_id: int, q: Optional[str] = None):
-    return {"user_id": user_id, "q": q}
