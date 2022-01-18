@@ -1,0 +1,20 @@
+version: '2.1'
+
+services:
+    postgresql:
+        container_name: postgresql
+        hostname: postgresql.mydomain
+        restart: always
+        privileged: true
+        image: postgres:latest
+        ports:
+            - 5432:5432
+        environment:
+            - POSTGRES_DB=dapeng
+            # - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=postgres
+        volumes:
+            - /etc/hosts:/etc/hosts:ro
+            - /sys/fs/cgroup:/sys/fs/cgroup:ro
+            - /usr/share/zoneinfo/Asia/Taipei:/etc/localtime:ro
+            - /home/daniel/docker/postgres/data:/var/lib/postgresql/data
