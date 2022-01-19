@@ -103,7 +103,7 @@ def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_t
             status_code=422, detail="start_time could not be empty")
     if start_time > end_time:
         raise HTTPException(
-            status_code=422, detail="end_time should be less than start_time")
+            status_code=422, detail="start_time should be less than end_time")
     try:
         if not id and not cam_id and not start_time and not end_time and not type:
             data = db.get_all_records()
