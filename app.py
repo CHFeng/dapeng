@@ -101,7 +101,7 @@ def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_t
     if end_time and not start_time:
         raise HTTPException(
             status_code=422, detail="start_time could not be empty")
-    if start_time > end_time:
+    if start_time and end_time and start_time > end_time:
         raise HTTPException(
             status_code=422, detail="start_time should be less than end_time")
     try:
