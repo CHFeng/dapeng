@@ -22,7 +22,7 @@ def custom_openapi():
     openapi_schema = get_openapi(
         title="大鵬灣車流&人流計數系統",
         version=APP_VERSION,
-        description="此文件說明如何透過Restful API存取車流&人流計數的統計資料與RTSP相關設定值的設定與存取",
+        description="此文件說明如何透過Restful API存取車流&人流計數的統計資料與NVR主機相關設定值的設定與存取",
         routes=app.routes,
     )
     openapi_schema["info"]["x-logo"] = {
@@ -105,8 +105,8 @@ def check_nvr():
     return data
 
 
-@app.get("/rtsp_config")
-def get_rtsp_config():
+@app.get("/nvr_config")
+def get_nvr_config():
     '''
     取得NVR主機的設定值,帳號,密碼,連線位址,PORT
     '''
@@ -120,8 +120,8 @@ def get_rtsp_config():
         return config
 
 
-@app.patch("/rtsp_config")
-def update_config(account: Optional[str] = None, password: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
+@app.patch("/nvr_config")
+def update_nvr_config(account: Optional[str] = None, password: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
     '''
     更新NVR主機的設定值
     '''
