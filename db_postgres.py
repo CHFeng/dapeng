@@ -39,7 +39,7 @@ class Database:
         if False in result[0]:
             createTable = "CREATE TABLE IF NOT EXISTS {} ( \
                 id uuid DEFAULT uuid_generate_v4 (), \
-                camId VARCHAR(20) NOT NULL, \
+                camId VARCHAR(50) NOT NULL, \
                 time timestamp NOT NULL, \
                 type VARCHAR(20) NOT NULL, \
                 inCounter int NOT NULL, \
@@ -80,7 +80,7 @@ class Database:
         else:
             print("Table '{}' is existed!".format(CONFIG_TABLE_NAME))
 
-    def add_record(self, camId: str, time: dt, type: str, inValue: int, outValue: int):
+    def add_record(self, camId: str, time: dt, type: str, inValue: int, outValue: int) -> None:
         insertData = "INSERT INTO {} (camId,time,type,inCounter,outCounter) \
         VALUES ('{}', '{}', '{}', {}, {});".format(RECORD_TABLE_NAME, camId, time, type, inValue, outValue)
 
@@ -89,7 +89,7 @@ class Database:
 
         print("insert record successfully")
 
-    def get_all_records(self):
+    def get_all_records(self) -> list:
         data = []
         getAllData = "SELECT * FROM {};".format(RECORD_TABLE_NAME)
 
@@ -102,7 +102,7 @@ class Database:
 
         return data
 
-    def get_record(self, id=None, camId=None, start_time=None, end_time=None, type=None):
+    def get_record(self, id=None, camId=None, start_time=None, end_time=None, type=None) -> list:
         data = []
         query = ''
         if id:
@@ -132,7 +132,7 @@ class Database:
 
         return data
 
-    def delete_record(self, id: str):
+    def delete_record(self, id: str) -> None:
         deleteData = "DELETE FROM {} WHERE id='{}';".format(
             RECORD_TABLE_NAME, id)
 
@@ -141,7 +141,10 @@ class Database:
 
         print("delete record successfully")
 
-    def get_config(self):
+    def get_config(self) -> dict:
+        '''
+        return dict {'account', 'password', 'host', 'port'}
+        '''
         data = {}
         getAllData = "SELECT * FROM {};".format(CONFIG_TABLE_NAME)
 
@@ -156,7 +159,7 @@ class Database:
 
         return data
 
-    def update_config(self, account: str, password: str, host: str, port: int):
+    def update_config(self, account: str, password: str, host: str, port: int) -> dict:
         updateData = ''
         if account:
             updateData += "account = '{}'".format(account)

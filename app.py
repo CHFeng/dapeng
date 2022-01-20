@@ -1,9 +1,13 @@
+import json
+import requests
+
 from typing import Optional
 from datetime import datetime as dt
 from uuid import UUID
 from fastapi import FastAPI, HTTPException
 from fastapi.openapi.utils import get_openapi
 from db_postgres import Database
+
 
 APP_VERSION = "0.1.0"
 # 建立一個 Fast API application
@@ -35,17 +39,39 @@ app.openapi = custom_openapi
 @app.get("/")
 def check_health():
     '''
-    回傳此服務的版本號碼
+    檢查相關服務狀態\n
+    version: 此服務的版本號碼\n
+    nvrStatus: 200(http通訊正常)\n
+    nvrHosts: NVR主機名稱\n
     '''
-    return "The Service works fine, Version:{}".format(APP_VERSION)
+    data = {
+        'version': APP_VERSION,
+        'nvrStatus': None,
+        'nvrHosts': None
+    }
+    # get nvr config
+    config = db.get_config()
+    url = "http://{}:{}/hosts/".format(config['host'], config['port'])
+    # get domain hosts
+    result = requests.get(url, auth=(config['account'], config['password']))
+    data["nvrStatus"] = result.status_code
+    data["nvrHosts"] = json.loads(result.text)
+
+    return data
 
 
 @app.get("/check_nvr")
 def check_nvr():
     '''
-    檢查與NVR影像主機間的通訊是否正常
+    檢查NVR影像來源狀態
     '''
-    return {"status": "OK"}
+    # get nvr config
+    config = db.get_config()
+    url = "http://{}:{}/video-origins/".format(config['host'], config['port'])
+    # get video source status
+    result = requests.get(url, auth=(config['account'], config['password']))
+
+    return {"status": result.status_code, 'msg': json.loads(result.text)}
 
 
 @app.get("/check_ai_model")
