@@ -29,50 +29,50 @@ class Database:
         # install uuid-ossp extension
         self.cursor.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
         # check object counter table existed or not
-        checkTableExisted = "SELECT EXISTS ( \
-                SELECT FROM pg_tables \
-                WHERE  schemaname = 'public' \
-                AND    tablename  = '{}');".format(RECORD_TABLE_NAME)
+        checkTableExisted = """SELECT EXISTS (
+                SELECT FROM pg_tables
+                WHERE  schemaname = 'public'
+                AND    tablename  = '{}');""".format(RECORD_TABLE_NAME)
         self.cursor.execute(checkTableExisted)
         result = self.cursor.fetchall()
         # if table doesn't exist create that
         if False in result[0]:
-            createTable = "CREATE TABLE IF NOT EXISTS {} ( \
-                id uuid DEFAULT uuid_generate_v4 (), \
-                camId VARCHAR(50) NOT NULL, \
-                time timestamp NOT NULL, \
-                type VARCHAR(20) NOT NULL, \
-                inCounter int NOT NULL, \
-                outCounter int NOT NULL, \
-                PRIMARY KEY (id) \
-                );".format(RECORD_TABLE_NAME)
+            createTable = """CREATE TABLE IF NOT EXISTS {} (
+                id uuid DEFAULT uuid_generate_v4 (),
+                camId VARCHAR(100) NOT NULL,
+                time timestamp NOT NULL,
+                type VARCHAR(20) NOT NULL,
+                inCounter int NOT NULL,
+                outCounter int NOT NULL,
+                PRIMARY KEY (id)
+                );""".format(RECORD_TABLE_NAME)
             self.cursor.execute(createTable)
             self.conn.commit()
             print("{} created successfully".format(RECORD_TABLE_NAME))
         else:
             print("Table '{}' is existed!".format(RECORD_TABLE_NAME))
         # check account table existed or not
-        checkTableExisted = "SELECT EXISTS ( \
-                SELECT FROM pg_tables \
-                WHERE  schemaname = 'public' \
-                AND    tablename  = '{}');".format(CONFIG_TABLE_NAME)
+        checkTableExisted = """SELECT EXISTS (
+                SELECT FROM pg_tables
+                WHERE  schemaname = 'public'
+                AND    tablename  = '{}');""".format(CONFIG_TABLE_NAME)
         self.cursor.execute(checkTableExisted)
         result = self.cursor.fetchall()
         # if table doesn't exist create that
         if False in result[0]:
-            createTable = "CREATE TABLE IF NOT EXISTS {} ( \
-                id int NOT NULL, \
-                account VARCHAR(20) NOT NULL, \
-                password VARCHAR(20) NOT NULL, \
-                host VARCHAR(50), \
-                port int, \
-                PRIMARY KEY (id) \
-                );".format(CONFIG_TABLE_NAME)
+            createTable = """CREATE TABLE IF NOT EXISTS {} (
+                id int NOT NULL,
+                account VARCHAR(20) NOT NULL,
+                password VARCHAR(20) NOT NULL,
+                host VARCHAR(50),
+                port int,
+                PRIMARY KEY (id)
+                );""".format(CONFIG_TABLE_NAME)
             self.cursor.execute(createTable)
             self.conn.commit()
             print("{} created successfully".format(CONFIG_TABLE_NAME))
-            insertData = "INSERT INTO {} (id,account,password,host,port) \
-                VALUES (0, '{}', '{}', '{}', {});".format(CONFIG_TABLE_NAME, "root", "root", "localhost", 80)
+            insertData = """INSERT INTO {} (id,account,password,host,port)
+                VALUES (0, '{}', '{}', '{}', {});""".format(CONFIG_TABLE_NAME, "root", "root", "localhost", 80)
 
             self.cursor.execute(insertData)
             self.conn.commit()
@@ -81,8 +81,8 @@ class Database:
             print("Table '{}' is existed!".format(CONFIG_TABLE_NAME))
 
     def add_record(self, camId: str, time: dt, type: str, inValue: int, outValue: int) -> None:
-        insertData = "INSERT INTO {} (camId,time,type,inCounter,outCounter) \
-        VALUES ('{}', '{}', '{}', {}, {});".format(RECORD_TABLE_NAME, camId, time, type, inValue, outValue)
+        insertData = """INSERT INTO {} (camId,time,type,inCounter,outCounter)
+        VALUES ('{}', '{}', '{}', {}, {});""".format(RECORD_TABLE_NAME, camId, time, type, inValue, outValue)
 
         self.cursor.execute(insertData)
         self.conn.commit()
@@ -114,7 +114,7 @@ class Database:
         if start_time and end_time:
             if query:
                 query += 'AND '
-            query += "time >= '{}' AND time <= '{}'".format(
+            query += "time >= '{}' AND time <= '{}' ".format(
                 start_time, end_time)
         if type:
             if query:
@@ -150,12 +150,10 @@ class Database:
 
         self.cursor.execute(getAllData)
         rows = self.cursor.fetchall()
-        print(rows[0])
-        if len(rows) == 1:
-            data['account'] = rows[0][1]
-            data['password'] = rows[0][2]
-            data['host'] = rows[0][3]
-            data['port'] = rows[0][4]
+        data['account'] = rows[0][1]
+        data['password'] = rows[0][2]
+        data['host'] = rows[0][3]
+        data['port'] = rows[0][4]
 
         return data
 
@@ -176,8 +174,8 @@ class Database:
                 updateData += ','
             updateData += "port = {}".format(port)
         if updateData != '':
-            updateData = "UPDATE {} SET ".format(CONFIG_TABLE_NAME) + updateData + \
-                "WHERE id = 0;"
+            updateData = "UPDATE {} SET ".format(
+                CONFIG_TABLE_NAME) + updateData + "WHERE id = 0;"
 
             self.cursor.execute(updateData)
             self.conn.commit()
