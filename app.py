@@ -139,9 +139,10 @@ def update_nvr_config(account: Optional[str] = None, password: Optional[str] = N
 def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_time: Optional[dt] = None, end_time: Optional[dt] = None, type: Optional[str] = None):
     '''
     取得指定影像來源、日期與時間參數下的物件辨識統計資料\n
-    沒有設定參數時取得全部資料\n
+    所有參數皆為optional，沒有設定參數時取得全部資料\n
     有設定時間時,start_time 與 end_time皆須設定\n
-    start_time & end_time format are "%Y-%m-%d %H:%M:%S".\n
+    cam_id: NVR影像來源的ID\n
+    start_time & end_time format的格式為: "%Y-%m-%d %H:%M:%S".\n
     e.g.: 2022-01-19 08:00:00 \n
     Response Value:\n
     statistics: 每個影像來源的統計數據\n
@@ -196,7 +197,7 @@ def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_t
 def add_record(camId: str, time: dt, type: str, inValue: int, outValue: int):
     '''
     新增一筆影像辨識紀錄\n
-    time format is "%Y-%m-%d %H:%M:%S".\n
+    time 的格式為: "%Y-%m-%d %H:%M:%S".\n
     e.g.: 2022-01-19 08:00:00
     '''
 
