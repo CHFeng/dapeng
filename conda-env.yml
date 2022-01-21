@@ -16,8 +16,6 @@ dependencies:
     - easydict
     - pillow
     - scipy
-    - pafy
-    - youtube-dl
     - fastapi
     - uvicorn
     - psycopg2

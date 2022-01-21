@@ -3,5 +3,3 @@ uvicorn
 psycopg2
 requests
 scipy
-pafy
-youtube-dl
