@@ -81,7 +81,7 @@ def check_nvr():
 
     data = {
         'nvrStatus': None,
-        'resp': {}
+        'resp': []
     }
     try:
         # get nvr config
@@ -97,7 +97,8 @@ def check_nvr():
             config['account'], config['password']))
         data["nvrStatus"] = result.status_code
         if result.status_code == requests.codes.ok:
-            data["resp"] = json.loads(result.text)
+            resp = json.loads(result.text)
+            data["resp"] = list(resp.values())
     except Exception as err:
         data["nvrStatus"] = 500
         data["detail"] = str(err)
