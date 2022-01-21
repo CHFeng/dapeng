@@ -1,43 +1,47 @@
+import time
 import os
+import requests
+import json
+import tensorflow as tf
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from tensorflow.compat.v1 import InteractiveSession
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.python.saved_model import tag_constants
+from PIL import Image
+from absl.flags import FLAGS
+from absl import app, flags, logging
+# local import
+from core.config import cfg
+from core.yolov4 import filter_boxes
+import core.utils as utils
+# deep sort
+from deep_sort.tracker import Tracker
+from deep_sort.detection import Detection
+from deep_sort import preprocessing, nn_matching
+from tools import generate_detections as gdet
 
 # comment out below line to enable tensorflow logging outputs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
-import time
-import tensorflow as tf
 
 physical_devices = tf.config.experimental.list_physical_devices("GPU")
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-from absl import app, flags, logging
-from absl.flags import FLAGS
-import core.utils as utils
-from core.yolov4 import filter_boxes
-from tensorflow.python.saved_model import tag_constants
-from core.config import cfg
-from PIL import Image
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
 
 # deep sort imports
-from deep_sort import preprocessing, nn_matching
-from deep_sort.detection import Detection
-from deep_sort.tracker import Tracker
-from tools import generate_detections as gdet
-
-# for capture streaming from youtube
-import pafy
 
 flags.DEFINE_string("framework", "tf", "(tf, tflite, trt")
-flags.DEFINE_string("weights", "./checkpoints/yolov4-416", "path to weights file")
+flags.DEFINE_string("weights", "./checkpoints/yolov4-416",
+                    "path to weights file")
 flags.DEFINE_integer("size", 416, "resize images to")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
-flags.DEFINE_string("video", "./data/video/test.mp4", "path to input video or set to 0 for webcam")
+flags.DEFINE_string("video", "./data/video/test.mp4",
+                    "path to input video or set to 0 for webcam")
 flags.DEFINE_string("output", None, "path to output video")
-flags.DEFINE_string("output_format", "XVID", "codec used in VideoWriter when saving video to file")
+flags.DEFINE_string("output_format", "XVID",
+                    "codec used in VideoWriter when saving video to file")
 flags.DEFINE_float("iou", 0.45, "iou threshold")
 flags.DEFINE_float("score", 0.50, "score threshold")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
@@ -45,16 +49,39 @@ flags.DEFINE_boolean("info", False, "show detailed info of tracked objects")
 flags.DEFINE_boolean("count", False, "count objects being tracked on screen")
 # the setting of object flow direction
 flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
-flags.DEFINE_integer("detect_pos", "520", "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_x", "0", "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_y", "0", "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos", "520",
+                     "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_x", "0",
+                     "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_y", "0",
+                     "the position coordinate for detecting")
 flags.DEFINE_integer("detect_distance", "20", "the distance for detecting")
 flags.DEFINE_integer("object_speed", "5", "the speed of object")
 flags.DEFINE_boolean("frame_debug", False, "show frame one by one for debug")
-flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
+flags.DEFINE_string(
+    "allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
+# NVR video source index
+flags.DEFINE_integer("video_idx", "2", "the NVR video source index")
 
 
 def main(_argv):
+    # get NVR config
+    try:
+        url = "http://localhost:8000/nvr_config"
+        result = requests.get(url)
+        if result.status_code == requests.codes.ok:
+            config = json.loads(result.text)
+        # get NVR video source
+        url = "http://localhost:8000/check_nvr"
+        result = requests.get(url)
+        if result.status_code == requests.codes.ok:
+            result = json.loads(result.text)
+            if result["resp"][FLAGS.video_idx]["state"] == 'signal_restored' or result["resp"][FLAGS.video_idx]["state"] == 'connected':
+                camId = result["resp"][FLAGS.video_idx]["origin"]
+                rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(
+                    config["account"], config["password"], config["host"], camId)
+    except:
+        exit("Can't not get NVR config")
     # Definition of the parameters
     max_cosine_distance = 0.4
     nn_budget = None
@@ -64,7 +91,8 @@ def main(_argv):
     model_filename = "model_data/mars-small128.pb"
     encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # calculate cosine distance metric
-    metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
+    metric = nn_matching.NearestNeighborDistanceMetric(
+        "cosine", max_cosine_distance, nn_budget)
     # initialize tracker
     tracker = Tracker(metric)
 
@@ -86,26 +114,14 @@ def main(_argv):
         print(output_details)
     # otherwise load standard tensorflow saved model
     else:
-        saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
+        saved_model_loaded = tf.saved_model.load(
+            FLAGS.weights, tags=[tag_constants.SERVING])
         infer = saved_model_loaded.signatures['serving_default']
 
     # begin video capture
-    # camera use 0 to open
-    # ipcam use rtsp://admin:aa888888@192.168.1.250
-    # 南灣-https://www.youtube.com/watch?v=sZXBFjepdeQ
-    # 冷水坑停車場-https://www.youtube.com/watch?v=GB64WeZZQPQ
-    try:
-        vid = cv2.VideoCapture(int(video_path))
-    except:
-        if "https://www.youtube.com/watch?v" in video_path:
-            video = pafy.new(video_path)
-            best = video.getbest(preftype="mp4")
-            vid = cv2.VideoCapture(best.url)
-        else:
-            vid = cv2.VideoCapture(video_path)
+    vid = cv2.VideoCapture(rtspUrl)
 
     out = None
-
     # get width & height from video
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -155,7 +171,8 @@ def main(_argv):
         if FLAGS.framework == "tflite":
             interpreter.set_tensor(input_details[0]['index'], image_data)
             interpreter.invoke()
-            pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
+            pred = [interpreter.get_tensor(
+                output_details[i]['index']) for i in range(len(output_details))]
             # run detections using yolov3 if flag is set
             if FLAGS.model == "yolov3" and FLAGS.tiny == True:
                 boxes, pred_conf = filter_boxes(
@@ -185,7 +202,8 @@ def main(_argv):
             valid_detections,
         ) = tf.image.combined_non_max_suppression(
             boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
-            scores=tf.reshape(pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
+            scores=tf.reshape(pred_conf, (tf.shape(pred_conf)[
+                              0], -1, tf.shape(pred_conf)[-1])),
             max_output_size_per_class=50,
             max_total_size=50,
             iou_threshold=FLAGS.iou,
@@ -212,17 +230,23 @@ def main(_argv):
         if FLAGS.flow_direction == "horizontal":
             # check detection area not over the screen
             if line_pos_1 > height or line_pos_2 > height:
-                print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, height))
+                print("the detection area:{}~{} over the screen:{}".format(
+                    line_pos_1, line_pos_2, height))
                 break
-            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_1), (width, line_pos_1), (255, 0, 0), 2)
-            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_2), (width, line_pos_2), (255, 0, 0), 2)
+            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_1),
+                     (width, line_pos_1), (255, 0, 0), 2)
+            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_2),
+                     (width, line_pos_2), (255, 0, 0), 2)
         else:
             # check detection area not over the screen
             if line_pos_1 > width or line_pos_2 > width:
-                print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, width))
+                print("the detection area:{}~{} over the screen:{}".format(
+                    line_pos_1, line_pos_2, width))
                 break
-            cv2.line(frame, (line_pos_1, FLAGS.detect_pos_y), (line_pos_1, height), (255, 0, 0), 2)
-            cv2.line(frame, (line_pos_2, FLAGS.detect_pos_y), (line_pos_2, height), (255, 0, 0), 2)
+            cv2.line(frame, (line_pos_1, FLAGS.detect_pos_y),
+                     (line_pos_1, height), (255, 0, 0), 2)
+            cv2.line(frame, (line_pos_2, FLAGS.detect_pos_y),
+                     (line_pos_2, height), (255, 0, 0), 2)
         # loop through objects and use class index to get class name, allow only classes in allowed_classes list
         names = []
         deleted_indx = []
@@ -252,7 +276,8 @@ def main(_argv):
 
         # encode yolo detections and feed to tracker
         features = encoder(frame, bboxes)
-        detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in zip(bboxes, scores, names, features)]
+        detections = [Detection(bbox, score, class_name, feature) for bbox,
+                      score, class_name, feature in zip(bboxes, scores, names, features)]
 
         # initialize color map
         cmap = plt.get_cmap("tab20b")
@@ -262,7 +287,8 @@ def main(_argv):
         boxs = np.array([d.tlwh for d in detections])
         scores = np.array([d.confidence for d in detections])
         classes = np.array([d.class_name for d in detections])
-        indices = preprocessing.non_max_suppression(boxs, classes, nms_max_overlap, scores)
+        indices = preprocessing.non_max_suppression(
+            boxs, classes, nms_max_overlap, scores)
         detections = [detections[i] for i in indices]
 
         # Call the tracker
@@ -290,7 +316,8 @@ def main(_argv):
                 frame,
                 (int(bbox[0]), int(bbox[1] - 30)),
                 (
-                    int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17,
+                    int(bbox[0]) + (len(class_name) +
+                                    len(str(track.track_id))) * 17,
                     int(bbox[1]),
                 ),
                 color,
@@ -316,7 +343,8 @@ def main(_argv):
             else:
                 tracked_pos = x_cen
             if tracked_pos > (FLAGS.detect_pos - FLAGS.detect_distance) and tracked_pos < (FLAGS.detect_pos + FLAGS.detect_distance):
-                print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {}".format(str(track.track_id), class_name, (x_cen, y_cen)))
+                print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {}".format(
+                    str(track.track_id), class_name, (x_cen, y_cen)))
                 checkDirection = True
                 # 當有設定FLAGS.detect_pos_y or FLAGS.detect_pos_x 需要物件位置大於設定值才計數
                 if FLAGS.detect_pos_y > 0 and y_cen < FLAGS.detect_pos_y:
@@ -344,7 +372,8 @@ def main(_argv):
                                     orig_pos = tracked_pos
                     # to append object into array if object doesn't existd
                     if not existed:
-                        obj = {"class": class_name, "id": track.track_id, "y_orig": y_cen, "x_orig": x_cen, "direction": "none"}
+                        obj = {"class": class_name, "id": track.track_id,
+                               "y_orig": y_cen, "x_orig": x_cen, "direction": "none"}
                         detect_objs.append(obj)
             # if enable info flag then print details about each track
             if FLAGS.info:
@@ -374,7 +403,8 @@ def main(_argv):
                     labelName = key.replace("up", "IN")
                 elif "down" in key:
                     labelName = key.replace("down", "OUT")
-            cv2.putText(frame, "{}:{}".format(labelName, counter[key]), (5, 35 + idx * 25), 0, 0.75, (255, 0, 0), 1)
+            cv2.putText(frame, "{}:{}".format(
+                labelName, counter[key]), (5, 35 + idx * 25), 0, 0.75, (255, 0, 0), 1)
             idx += 1
         # calculate frames per second of running detections
         fps = 1.0 / (time.time() - start_time)
