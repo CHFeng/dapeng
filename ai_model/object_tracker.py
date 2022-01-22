@@ -6,12 +6,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 physical_devices = tf.config.experimental.list_physical_devices("GPU")
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-# set memory limit
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
-config = tf.compat.v1.ConfigProto()
-config.gpu_options.visible_device_list = '0'
-config.gpu_options.allow_growth = True
-sess = tf.compat.v1.Session(config=config)
 
 import time
 import requests
@@ -35,37 +29,32 @@ from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
 from tools import generate_detections as gdet
 
-flags.DEFINE_string("framework", "tf", "(tf, tflite, trt")
 flags.DEFINE_string("weights", "./checkpoints/yolov4-416",
                     "path to weights file")
 flags.DEFINE_integer("size", 416, "resize images to")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
-flags.DEFINE_string("video", "./data/video/test.mp4",
-                    "path to input video or set to 0 for webcam")
-flags.DEFINE_string("output", None, "path to output video")
-flags.DEFINE_string("output_format", "XVID",
-                    "codec used in VideoWriter when saving video to file")
 flags.DEFINE_float("iou", 0.45, "iou threshold")
 flags.DEFINE_float("score", 0.50, "score threshold")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
-flags.DEFINE_boolean("info", False, "show detailed info of tracked objects")
-flags.DEFINE_boolean("count", False, "count objects being tracked on screen")
+flags.DEFINE_boolean("info", True, "show detailed info of tracked objects")
 # the setting of object flow direction
 flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
-flags.DEFINE_integer("detect_pos", "520",
+flags.DEFINE_integer("detect_pos", "1600",
                      "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_x", "0",
+flags.DEFINE_integer("detect_pos_x", "1480",
                      "the position coordinate for detecting")
 flags.DEFINE_integer("detect_pos_y", "0",
                      "the position coordinate for detecting")
-flags.DEFINE_integer("detect_distance", "20", "the distance for detecting")
-flags.DEFINE_integer("object_speed", "5", "the speed of object")
+flags.DEFINE_integer("detect_distance", "80", "the distance for detecting")
+flags.DEFINE_integer("object_speed", "35", "the speed of object")
 flags.DEFINE_boolean("frame_debug", False, "show frame one by one for debug")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
                     "allowed classes")
 # NVR video source index
 flags.DEFINE_integer("video_idx", "2", "the NVR video source index")
+# the font scale to show object counter result on frame
+FONT_SCALE = 2
 
 
 def main(_argv):
@@ -107,24 +96,13 @@ def main(_argv):
     # load configuration for object detector
     config = ConfigProto()
     config.gpu_options.allow_growth = True
-    session = InteractiveSession(config=config)
+    InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
     input_size = FLAGS.size
-    video_path = FLAGS.video
 
-    # load tflite model if flag is set
-    if FLAGS.framework == "tflite":
-        interpreter = tf.lite.Interpreter(model_path=FLAGS.weights)
-        interpreter.allocate_tensors()
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        print(input_details)
-        print(output_details)
-    # otherwise load standard tensorflow saved model
-    else:
-        saved_model_loaded = tf.saved_model.load(FLAGS.weights,
-                                                 tags=[tag_constants.SERVING])
-        infer = saved_model_loaded.signatures['serving_default']
+    saved_model_loaded = tf.saved_model.load(FLAGS.weights,
+                                             tags=[tag_constants.SERVING])
+    infer = saved_model_loaded.signatures['serving_default']
 
     print(rtspUrl)
     # begin video capture
@@ -134,13 +112,7 @@ def main(_argv):
     # get width & height from video
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    # get video ready to save locally if flag is set
-    if FLAGS.output:
-        # by default VideoCapture returns float instead of int
-        fps = int(vid.get(cv2.CAP_PROP_FPS))
-        codec = cv2.VideoWriter_fourcc(*FLAGS.output_format)
-        out = cv2.VideoWriter(FLAGS.output, codec, fps, (width, height))
+    print("The width:{} height:{}".format(width, height))
 
     # read in all class names from config
     class_names = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -150,8 +122,6 @@ def main(_argv):
     else:
         # by default allow all classes in .names file
         allowed_classes = list(class_names.values())
-    # custom allowed classes (uncomment line below to customize tracker for only people)
-    # allowed_classes = ["car", "truck", "bus", "motorbike", "bicycle"]
 
     # the detection area line
     line_pos_1 = FLAGS.detect_pos - FLAGS.detect_distance
@@ -160,52 +130,31 @@ def main(_argv):
     frame_num = 0
     detect_objs = []
     # while video is running
-    while True:
+    while vid.isOpened():
         start_time = time.time()
         return_value, frame = vid.read()
         if return_value:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(frame)
         else:
             print("Video has ended or failed, try a different video format!")
-            break
+            vid.release()
+            vid = cv2.VideoCapture(rtspUrl)
+            continue
         frame_num += 1
-        print("Frame #: ", frame_num)
+        if FLAGS.info:
+            print("Frame #: ", frame_num)
         frame_size = frame.shape[:2]
         image_data = cv2.resize(frame, (input_size, input_size))
         image_data = image_data / 255.0
         image_data = image_data[np.newaxis, ...].astype(np.float32)
 
-        # run detections on tflite if flag is set
-        if FLAGS.framework == "tflite":
-            interpreter.set_tensor(input_details[0]['index'], image_data)
-            interpreter.invoke()
-            pred = [
-                interpreter.get_tensor(output_details[i]['index'])
-                for i in range(len(output_details))
-            ]
-            # run detections using yolov3 if flag is set
-            if FLAGS.model == "yolov3" and FLAGS.tiny == True:
-                boxes, pred_conf = filter_boxes(
-                    pred[1],
-                    pred[0],
-                    score_threshold=0.25,
-                    input_shape=tf.constant([input_size, input_size]),
-                )
-            else:
-                boxes, pred_conf = filter_boxes(
-                    pred[0],
-                    pred[1],
-                    score_threshold=0.25,
-                    input_shape=tf.constant([input_size, input_size]),
-                )
-        else:
-            batch_data = tf.constant(image_data)
-            pred_bbox = infer(batch_data)
-            for key, value in pred_bbox.items():
-                boxes = value[:, :, 0:4]
-                pred_conf = value[:, :, 4:]
-
+        # run detections
+        batch_data = tf.constant(image_data)
+        pred_bbox = infer(batch_data)
+        for key, value in pred_bbox.items():
+            boxes = value[:, :, 0:4]
+            pred_conf = value[:, :, 4:]
+        # combined_non_max_suppression
         (
             boxes,
             scores,
@@ -221,7 +170,6 @@ def main(_argv):
             iou_threshold=FLAGS.iou,
             score_threshold=FLAGS.score,
         )
-
         # convert data to numpy arrays and slice out unused elements
         num_objects = valid_detections.numpy()[0]
         bboxes = boxes.numpy()[0]
@@ -271,17 +219,6 @@ def main(_argv):
                 names.append(class_name)
         names = np.array(names)
         counter = len(names)
-        if FLAGS.count:
-            cv2.putText(
-                frame,
-                "Objects being tracked: {}".format(counter),
-                (5, 35),
-                cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                2,
-                (0, 255, 0),
-                2,
-            )
-            print("Objects being tracked: {}".format(counter))
         # delete detections that are not in allowed_classes
         bboxes = np.delete(bboxes, deleted_indx, axis=0)
         scores = np.delete(scores, deleted_indx, axis=0)
@@ -360,9 +297,11 @@ def main(_argv):
             if tracked_pos > (FLAGS.detect_pos -
                               FLAGS.detect_distance) and tracked_pos < (
                                   FLAGS.detect_pos + FLAGS.detect_distance):
-                print(
-                    "Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {}"
-                    .format(str(track.track_id), class_name, (x_cen, y_cen)))
+                if FLAGS.info:
+                    print(
+                        "Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {}"
+                        .format(str(track.track_id), class_name,
+                                (x_cen, y_cen)))
                 checkDirection = True
                 # 當有設定FLAGS.detect_pos_y or FLAGS.detect_pos_x 需要物件位置大於設定值才計數
                 if FLAGS.detect_pos_y > 0 and y_cen < FLAGS.detect_pos_y:
@@ -380,7 +319,7 @@ def main(_argv):
                             else:
                                 orig_pos = obj['x_orig']
                             diff = tracked_pos - orig_pos
-                            print('diff:%d' % diff)
+                            # check object direction if it is none
                             if obj['direction'] == "none":
                                 if diff >= FLAGS.object_speed:
                                     obj['direction'] = "down"
@@ -399,11 +338,11 @@ def main(_argv):
                         }
                         detect_objs.append(obj)
             # if enable info flag then print details about each track
-            if FLAGS.info:
-                print(
-                    "Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}"
-                    .format(str(track.track_id), class_name, (int(
-                        bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
+            # if FLAGS.info:
+            #     print(
+            #         "Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}"
+            #         .format(str(track.track_id), class_name, (int(
+            #             bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
         # define counter for every objects
         counter = {}
         for name in allowed_classes:
@@ -429,22 +368,21 @@ def main(_argv):
                 elif "down" in key:
                     labelName = key.replace("down", "OUT")
             cv2.putText(frame, "{}:{}".format(labelName, counter[key]),
-                        (5, 35 + idx * 25), 0, 0.75, (255, 0, 0), 1)
+                        (width // 3, 35 + idx * 25 * FONT_SCALE), 0,
+                        FONT_SCALE, (255, 0, 0), 1)
             idx += 1
         # calculate frames per second of running detections
         fps = 1.0 / (time.time() - start_time)
-        print("FPS: %.2f" % fps)
-        result = np.asarray(frame)
-        result = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        # resize the ouput frame to 1280x720
-        result = cv2.resize(result, (1280, 720))
+        if FLAGS.info:
+            print("FPS: %.2f" % fps)
         # show image on screen
         if not FLAGS.dont_show:
+            result = np.asarray(frame)
+            result = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            # resize the ouput frame to 1280x720
+            result = cv2.resize(result, (1280, 720))
             cv2.imshow("Output Video", result)
 
-        # if output flag is set, save video file
-        if FLAGS.output:
-            out.write(result)
         # check exit when press keyboard 'q'
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
