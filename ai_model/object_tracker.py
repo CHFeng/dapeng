@@ -54,8 +54,8 @@ flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
 flags.DEFINE_integer("video_idx", "2", "the NVR video source index")
 # the font scale to show object counter result on frame
 FONT_SCALE = 2
-# the time interval(min) to write counter value into DB
-WRITE_DB_MIN_INTERVAL = 5
+# the time interval(seconds) to write counter value into DB
+WRITE_DB_INTERVAL = 5 * 60
 
 
 def write_into_db(counter, camId, allowed_classes):
@@ -96,7 +96,7 @@ def write_into_db(counter, camId, allowed_classes):
     except Exception as err:
         print("write into DB Err:" + str(err))
 
-    print("send request successfully! " +
+    print("write into DB successfully! " +
           dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
@@ -430,7 +430,7 @@ def main(_argv):
             cv2.imshow("Output Video", result)
         # wirte data into DB every time inteval
         diffTime = dt.now() - lastWriteTime
-        if diffTime.minute >= WRITE_DB_MIN_INTERVAL:
+        if diffTime.seconds >= WRITE_DB_INTERVAL:
             # update last time stamp
             lastWriteTime = dt.now()
             write_into_db(counter, camId, allowed_classes)
