@@ -16,8 +16,10 @@ class Database:
         initialize database connection and make sure the object counter table exists
         '''
         # create connection
-        self.conn = psycopg2.connect(database=DB_NAME, user=USER,
-                                     password=PWD, host=HOST)
+        self.conn = psycopg2.connect(database=DB_NAME,
+                                     user=USER,
+                                     password=PWD,
+                                     host=HOST)
         # set auto commit is true
         self.conn.autocommit = True
         # get instance of cursor
@@ -72,7 +74,8 @@ class Database:
             self.conn.commit()
             print("{} created successfully".format(CONFIG_TABLE_NAME))
             insertData = """INSERT INTO {} (id,account,password,host,port)
-                VALUES (0, '{}', '{}', '{}', {});""".format(CONFIG_TABLE_NAME, "root", "root", "localhost", 80)
+                VALUES (0, '{}', '{}', '{}', {});""".format(
+                CONFIG_TABLE_NAME, "root", "root", "localhost", 80)
 
             self.cursor.execute(insertData)
             self.conn.commit()
@@ -80,9 +83,12 @@ class Database:
         else:
             print("Table '{}' is existed!".format(CONFIG_TABLE_NAME))
 
-    def add_record(self, camId: str, time: dt, type: str, inValue: int, outValue: int) -> None:
+    def add_record(self, camId: str, time: dt, type: str, inValue: int,
+                   outValue: int) -> None:
         insertData = """INSERT INTO {} (camId,time,type,inCounter,outCounter)
-        VALUES ('{}', '{}', '{}', {}, {});""".format(RECORD_TABLE_NAME, camId, time, type, inValue, outValue)
+        VALUES ('{}', '{}', '{}', {}, {});""".format(RECORD_TABLE_NAME, camId,
+                                                     time, type, inValue,
+                                                     outValue)
 
         self.cursor.execute(insertData)
         self.conn.commit()
@@ -96,13 +102,24 @@ class Database:
         self.cursor.execute(getAllData)
         rows = self.cursor.fetchall()
         for row in rows:
-            record = {'id': row[0], 'camId': row[1], 'time': row[2],
-                      'type': row[3], 'inCounter': row[4], 'outCounter': row[5]}
+            record = {
+                'id': row[0],
+                'camId': row[1],
+                'time': row[2],
+                'type': row[3],
+                'inCounter': row[4],
+                'outCounter': row[5]
+            }
             data.append(record)
 
         return data
 
-    def get_record(self, id=None, camId=None, start_time=None, end_time=None, type=None) -> list:
+    def get_record(self,
+                   id=None,
+                   camId=None,
+                   start_time=None,
+                   end_time=None,
+                   type=None) -> list:
         data = []
         query = ''
         if id:
@@ -126,8 +143,14 @@ class Database:
         self.cursor.execute(query)
         rows = self.cursor.fetchall()
         for row in rows:
-            record = {'id': row[0], 'camId': row[1], 'time': row[2],
-                      'type': row[3], 'inCounter': row[4], 'outCounter': row[5]}
+            record = {
+                'id': row[0],
+                'camId': row[1],
+                'time': row[2],
+                'type': row[3],
+                'inCounter': row[4],
+                'outCounter': row[5]
+            }
             data.append(record)
 
         return data
@@ -157,7 +180,8 @@ class Database:
 
         return data
 
-    def update_config(self, account: str, password: str, host: str, port: int) -> dict:
+    def update_config(self, account: str, password: str, host: str,
+                      port: int) -> dict:
         updateData = ''
         if account:
             updateData += "account = '{}'".format(account)

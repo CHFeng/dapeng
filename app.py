@@ -1,19 +1,31 @@
 import json
 import requests
 
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime as dt
 from uuid import UUID
 from fastapi import FastAPI, HTTPException
 from fastapi.openapi.utils import get_openapi
+from pydantic import BaseModel
 from db_postgres import Database
-
 
 APP_VERSION = "0.1.0"
 # 建立一個 Fast API application
 app = FastAPI()
 # create postgres instance
 db = Database()
+
+
+class Record(BaseModel):
+    camId: str
+    time: dt
+    type: str
+    inValue: int
+    outValue: int
+
+
+class Records(BaseModel):
+    records: List[Record]
 
 
 def custom_openapi():
@@ -45,11 +57,7 @@ def check_health():
     nvrHosts: NVR主機名稱\n
     '''
 
-    data = {
-        'version': APP_VERSION,
-        'nvrStatus': None,
-        'nvrHosts': []
-    }
+    data = {'version': APP_VERSION, 'nvrStatus': None, 'nvrHosts': []}
     try:
         # get nvr config
         config = db.get_config()
@@ -59,8 +67,8 @@ def check_health():
     try:
         url = "http://{}:{}/hosts/".format(config['host'], config['port'])
         # get domain hosts
-        result = requests.get(url, auth=(
-            config['account'], config['password']))
+        result = requests.get(url,
+                              auth=(config['account'], config['password']))
         data["nvrStatus"] = result.status_code
         if result.status_code == requests.codes.ok:
             data["nvrHosts"] = json.loads(result.text)
@@ -79,10 +87,7 @@ def check_nvr():
     resp
     '''
 
-    data = {
-        'nvrStatus': None,
-        'resp': []
-    }
+    data = {'nvrStatus': None, 'resp': []}
     try:
         # get nvr config
         config = db.get_config()
@@ -90,11 +95,11 @@ def check_nvr():
         raise HTTPException(status_code=500, detail=str(err))
 
     try:
-        url = "http://{}:{}/video-origins/".format(
-            config['host'], config['port'])
+        url = "http://{}:{}/video-origins/".format(config['host'],
+                                                   config['port'])
         # get video source status
-        result = requests.get(url, auth=(
-            config['account'], config['password']))
+        result = requests.get(url,
+                              auth=(config['account'], config['password']))
         data["nvrStatus"] = result.status_code
         if result.status_code == requests.codes.ok:
             resp = json.loads(result.text)
@@ -122,7 +127,10 @@ def get_nvr_config():
 
 
 @app.patch("/nvr_config")
-def update_nvr_config(account: Optional[str] = None, password: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
+def update_nvr_config(account: Optional[str] = None,
+                      password: Optional[str] = None,
+                      host: Optional[str] = None,
+                      port: Optional[int] = None):
     '''
     更新NVR主機的設定值
     '''
@@ -137,7 +145,11 @@ def update_nvr_config(account: Optional[str] = None, password: Optional[str] = N
 
 
 @app.get("/records")
-def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_time: Optional[dt] = None, end_time: Optional[dt] = None, type: Optional[str] = None):
+def get_records(id: Optional[UUID] = None,
+                cam_id: Optional[str] = None,
+                start_time: Optional[dt] = None,
+                end_time: Optional[dt] = None,
+                type: Optional[str] = None):
     '''
     取得指定影像來源、日期與時間參數下的物件辨識統計資料\n
     所有參數皆為optional，沒有設定參數時取得全部資料\n
@@ -150,19 +162,16 @@ def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_t
     records: 指定條件下的每筆紀錄\n
     '''
 
-    data = {
-        'statistics': {},
-        'records': []
-    }
+    data = {'statistics': {}, 'records': []}
     if start_time and not end_time:
-        raise HTTPException(
-            status_code=422, detail="end_time could not be empty")
+        raise HTTPException(status_code=422,
+                            detail="end_time could not be empty")
     if end_time and not start_time:
-        raise HTTPException(
-            status_code=422, detail="start_time could not be empty")
+        raise HTTPException(status_code=422,
+                            detail="start_time could not be empty")
     if start_time and end_time and start_time > end_time:
-        raise HTTPException(
-            status_code=422, detail="start_time should be less than end_time")
+        raise HTTPException(status_code=422,
+                            detail="start_time should be less than end_time")
     try:
         if not id and not cam_id and not start_time and not end_time and not type:
             rows = db.get_all_records()
@@ -194,16 +203,20 @@ def get_records(id: Optional[UUID] = None, cam_id: Optional[str] = None, start_t
         return data
 
 
-@app.post("/record")
-def add_record(camId: str, time: dt, type: str, inValue: int, outValue: int):
+@app.post("/records")
+def add_records(body: Records):
     '''
-    新增一筆影像辨識紀錄\n
-    time 的格式為: "%Y-%m-%d %H:%M:%S".\n
-    e.g.: 2022-01-19 08:00:00
+    新增多筆影像辨識紀錄\n
+    camId: 攝影機ID\n
+    time: 格式為"%Y-%m-%d %H:%M:%S". e.g.: 2022-01-19 08:00:00\n
+    type: 物件型態(person, car, bus...etc)\n
+    inValue: 進場次數\n
+    outValue: 離場次數\n
     '''
-
     try:
-        db.add_record(camId, time, type, inValue, outValue)
+        for record in body.records:
+            db.add_record(record.camId, record.time, record.type,
+                          record.inValue, record.outValue)
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     else:
@@ -214,7 +227,7 @@ def add_record(camId: str, time: dt, type: str, inValue: int, outValue: int):
 def delect_record(id: UUID):
     '''
     刪除一筆影像紀錄\n
-    id為該筆紀錄的uuid
+    id: 該筆紀錄的uuid
     '''
 
     try:

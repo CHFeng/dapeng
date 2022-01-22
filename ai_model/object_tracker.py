@@ -13,21 +13,20 @@ import json
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from datetime import datetime as dt
 from tensorflow.compat.v1 import InteractiveSession
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.python.saved_model import tag_constants
-from PIL import Image
 from absl.flags import FLAGS
 from absl import app, flags, logging
 # local import
 from core.config import cfg
-from core.yolov4 import filter_boxes
 import core.utils as utils
+from tools import generate_detections as gdet
 # deep sort imports
 from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
-from tools import generate_detections as gdet
 
 flags.DEFINE_string("weights", "./checkpoints/yolov4-416",
                     "path to weights file")
@@ -55,6 +54,50 @@ flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
 flags.DEFINE_integer("video_idx", "2", "the NVR video source index")
 # the font scale to show object counter result on frame
 FONT_SCALE = 2
+# the time interval(min) to write counter value into DB
+WRITE_DB_MIN_INTERVAL = 5
+
+
+def write_into_db(counter, camId, allowed_classes):
+    '''
+    將統計資料透過POST寫入DB
+    counter type is dict and key is object type & direction.
+    e.g. person-down or person-up
+    '''
+    records = []
+    body = []
+    # combine all types value into list except in & out value is 0
+    for class_type in allowed_classes:
+        data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
+        key = class_type + "-up"
+        if key in counter:
+            data["inValue"] += counter[key]
+        key = class_type + "-down"
+        if key in counter:
+            data["outValue"] += counter[key]
+        if data['inValue'] > 0 or data['outValue'] > 0:
+            records.append(data)
+    # write every record into database
+    for record in records:
+        body.append({
+            'camId': camId,
+            'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': record['class_type'],
+            'inValue': record['inValue'],
+            'outValue': record['outValue']
+        })
+    # send post request
+    try:
+        url = "http://localhost:8000/records"
+        body = json.dumps({'records': body})
+        result = requests.post(url, data=body)
+        if result.status_code != requests.codes.ok:
+            print("send request Err:" + json.loads(result.text))
+    except Exception as err:
+        print("write into DB Err:" + str(err))
+
+    print("send request successfully! " +
+          dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def main(_argv):
@@ -77,7 +120,9 @@ def main(_argv):
                     config["account"], config["password"], config["host"],
                     camId)
     except:
-        exit("Can't not get NVR config")
+        # exit("Can't not get NVR config")
+        # just for test
+        rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
     # Definition of the parameters
     max_cosine_distance = 0.4
     nn_budget = None
@@ -129,6 +174,7 @@ def main(_argv):
 
     frame_num = 0
     detect_objs = []
+    lastWriteTime = dt.now()
     # while video is running
     while vid.isOpened():
         start_time = time.time()
@@ -382,6 +428,14 @@ def main(_argv):
             # resize the ouput frame to 1280x720
             result = cv2.resize(result, (1280, 720))
             cv2.imshow("Output Video", result)
+        # wirte data into DB every time inteval
+        diffTime = dt.now() - lastWriteTime
+        if diffTime.minute >= WRITE_DB_MIN_INTERVAL:
+            # update last time stamp
+            lastWriteTime = dt.now()
+            write_into_db(counter, camId, allowed_classes)
+            # reset counter
+            detect_objs = []
 
         # check exit when press keyboard 'q'
         if cv2.waitKey(1) & 0xFF == ord("q"):
