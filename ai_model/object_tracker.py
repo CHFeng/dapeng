@@ -122,6 +122,7 @@ def main(_argv):
     except:
         # exit("Can't not get NVR config")
         # just for test
+        print("Can't not get NVR config, use default rtsp url")
         rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
     # Definition of the parameters
     max_cosine_distance = 0.4
@@ -153,7 +154,6 @@ def main(_argv):
     # begin video capture
     vid = cv2.VideoCapture(rtspUrl)
 
-    out = None
     # get width & height from video
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
