@@ -94,6 +94,57 @@ def yolov4(cam):
     return detections
 
 
+def check_track_direction(cam, bbox, class_name, track_id):
+    # calcuate position of bbox and draw circle on
+    x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
+    y_cen = int(bbox[1] + (bbox[3] - bbox[1]) / 2)
+    cv2.circle(cam.img_handle, (x_cen, y_cen), 5, (255, 0, 0), -1)
+    # check be tracked object on detection area
+    tracked_pos = 0
+    if cam.args.flow_direction == "horizontal":
+        tracked_pos = y_cen
+    else:
+        tracked_pos = x_cen
+    if tracked_pos > (cam.args.detect_pos -
+                      cam.args.detect_distance) and tracked_pos < (
+                          cam.args.detect_pos + cam.args.detect_distance):
+        checkDirection = True
+        # 當有設定cam.args.detect_pos_y or cam.args.detect_pos_x 需要物件位置大於設定值才計數
+        if cam.args.detect_pos_y > 0 and y_cen < cam.args.detect_pos_y:
+            checkDirection = False
+        elif cam.args.detect_pos_x > 0 and x_cen < cam.args.detect_pos_y:
+            checkDirection = False
+
+        if checkDirection:
+            existed = False
+            for obj in cam.detect_objs:
+                if obj['id'] == track_id:
+                    existed = True
+                    if cam.args.flow_direction == "horizontal":
+                        orig_pos = obj['y_orig']
+                    else:
+                        orig_pos = obj['x_orig']
+                    diff = tracked_pos - orig_pos
+                    # check object direction if it is none
+                    if obj['direction'] == "none":
+                        if diff >= cam.args.object_speed:
+                            obj['direction'] = "down"
+                            orig_pos = tracked_pos
+                        elif diff <= -cam.args.object_speed:
+                            obj['direction'] = "up"
+                            orig_pos = tracked_pos
+            # to append object into array if object doesn't existd
+            if not existed:
+                obj = {
+                    "class": class_name,
+                    "id": track_id,
+                    "y_orig": y_cen,
+                    "x_orig": x_cen,
+                    "direction": "none"
+                }
+                cam.detect_objs.append(obj)
+
+
 def deep_sort(cam, detections):
     # Call the tracker
     cam.tracker.predict()
@@ -107,8 +158,8 @@ def deep_sort(cam, detections):
             continue
         bbox = track.to_tlbr()
         class_name = track.get_class()
-
-        # draw bbox on screen
+        check_track_direction(cam, bbox, class_name, track.track_id)
+        # draw bbox on screen, just for debug
         color = colors[int(track.track_id) % len(colors)]
         color = [i * 255 for i in color]
         cv2.rectangle(
@@ -140,6 +191,40 @@ def deep_sort(cam, detections):
         )
 
 
+def counter_object(cam):
+    # the font scale to show object counter result on frame
+    FONT_SCALE = 2
+    # define counter for every objects
+    counter = {}
+    for name in cam.allowed_classes:
+        key_up = name + "-up"
+        key_down = name + "-down"
+        counter[key_up] = 0
+        counter[key_down] = 0
+    # record objects direction
+    for obj in cam.detect_objs:
+        if obj['direction'] == "none":
+            continue
+        key = obj['class'] + "-" + obj['direction']
+        counter[key] += 1
+    # show object direction counter value on screen
+    idx = 0
+    for key in counter:
+        if counter[key] == 0:
+            continue
+        labelName = key
+        if cam.args.flow_direction == "vertical":
+            if "up" in key:
+                labelName = key.replace("up", "IN")
+            elif "down" in key:
+                labelName = key.replace("down", "OUT")
+        # just for debug, show result on image
+        cv2.putText(cam.img_handle, "{}:{}".format(labelName, counter[key]),
+                    (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0,
+                    FONT_SCALE, (255, 0, 0), 1)
+        idx += 1
+
+
 def sub_process(cam):
     """This 'sub_process' function is designed to be run in the sub-thread.
     Once started, this thread continues to grab a new image and put it
@@ -156,6 +241,7 @@ def sub_process(cam):
         # run detection by yolov4
         detections = yolov4(cam)
         deep_sort(cam, detections)
+        counter_object(cam)
         cam.is_detected = True
 
     cam.thread_running = False

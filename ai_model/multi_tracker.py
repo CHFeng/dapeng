@@ -29,6 +29,16 @@ flags.DEFINE_boolean("dont_show", False, "dont show video output")
 flags.DEFINE_boolean("info", True, "show detailed info of tracked objects")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
                     "allowed classes")
+# the setting of object flow direction
+flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
+flags.DEFINE_integer("detect_pos", "1600",
+                     "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_x", "1480",
+                     "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_y", "0",
+                     "the position coordinate for detecting")
+flags.DEFINE_integer("detect_distance", "80", "the distance for detecting")
+flags.DEFINE_integer("object_speed", "35", "the speed of object")
 
 
 def main(_argv):
