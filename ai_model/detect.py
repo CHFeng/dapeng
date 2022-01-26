@@ -57,7 +57,10 @@ def yolov4(cam):
 
     # store all predictions in one parameter for simplicity when calling functions
     pred_bbox = [bboxes, scores, classes, num_objects]
-
+    # just for debug
+    # cam.img_handle = utils.draw_bbox(cam.img_handle,
+    #                                  pred_bbox,
+    #                                  classes=cam.class_names)
     # loop through objects and use class index to get class name, allow only classes in allowed_classes list
     names = []
     deleted_indx = []
@@ -153,6 +156,7 @@ def sub_process(cam):
         # run detection by yolov4
         detections = yolov4(cam)
         deep_sort(cam, detections)
+        cam.is_detected = True
 
     cam.thread_running = False
 
@@ -169,7 +173,7 @@ class Detect:
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", max_cosine_distance, nn_budget)
         # initialize tracker
-        self.tracker = Tracker(metric, max_age=30)
+        self.tracker = Tracker(metric, max_age=120)
         # initialize yolov4
         self.infer = infer
         # initialize rtsp url
@@ -191,6 +195,7 @@ class Detect:
         self.detect_objs = []
         self.lastWriteTime = dt.now()
         self.thread_running = False
+        self.is_detected = False
         self._open()  # try to open the camera
 
     def _open(self):
@@ -198,8 +203,14 @@ class Detect:
         if self.vid is not None:
             raise RuntimeError('camera is already opened!')
         print('RTSP url is: {}'.format(self.rtspUrl))
-        self.vid = cv2.VideoCapture(self.rtspUrl)
-        self._start()
+        while True:
+            self.vid = cv2.VideoCapture(self.rtspUrl)
+            self._start()
+            # check cam is opened, else do it again
+            if self.is_opened:
+                break
+            else:
+                self.vid.release()
 
     def isOpened(self):
         return self.is_opened
@@ -238,8 +249,9 @@ class Detect:
 
         Returns None if the camera runs out of image or error.
         """
-        if not self.is_opened:
+        if not self.is_opened or not self.is_detected:
             return None
+        self.is_detected = False
 
         return self.img_handle
 

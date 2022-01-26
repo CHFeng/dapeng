@@ -41,22 +41,24 @@ def main(_argv):
                                              tags=[tag_constants.SERVING])
     infer = saved_model_loaded.signatures['serving_default']
 
-    rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
-    rtspUrl2 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0"
-    rtspUrl3 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0"
+    rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0"
+    rtspUrl2 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0"
+    rtspUrl3 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
     cam = Detect(rtspUrl, infer, FLAGS)
     cam2 = Detect(rtspUrl2, infer, FLAGS)
     cam3 = Detect(rtspUrl3, infer, FLAGS)
 
-    camIdx = 0
+    camIdx = 2
     while True:
+        # '''
         if camIdx == 0:
             img = cam.read()
         elif camIdx == 1:
             img = cam2.read()
         else:
             img = cam3.read()
-
+        # '''
+        # img = cam3.read()
         if img is not None:
             img = cv2.resize(img, (1280, 720))
             cv2.imshow('result', img)
