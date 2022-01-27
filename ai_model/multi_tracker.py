@@ -98,22 +98,23 @@ def main(_argv):
         cam = Detect(rtspUrl, camId, infer, FLAGS)
         cams.append(cam)
 
-    camIdx = 2
+    camIdx = 0
     while True:
         img = cams[camIdx].read()
         if img is not None:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.resize(img, (1280, 720))
             cv2.imshow('result', img)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
             break
-        elif key == ord("0"):
-            camIdx = 0
-        elif key == ord("1"):
-            camIdx = 1
-        elif key == ord("2"):
-            camIdx = 2
+        elif key >= ord("1") and key <= ord("8"):
+            camIdx = key - ord("1")
+            if camIdx >= len(camIds):
+                print("Only {} video sources".format(len(camIds)))
+                camIdx = len(camIds) - 1
+
     # release thread
     for cam in cams:
         cam.release()

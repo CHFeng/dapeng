@@ -1,6 +1,7 @@
 import cv2
 import requests
 import json
+import time
 import tensorflow as tf
 import threading
 from datetime import datetime as dt
@@ -22,39 +23,39 @@ def write_into_db(counter, camId, allowed_classes):
     counter type is dict and key is object type & direction.
     e.g. person-down or person-up
     '''
-    records = []
-    body = []
-    # combine all types value into list except in & out value is 0
-    for class_type in allowed_classes:
-        data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
-        key = class_type + "-up"
-        if key in counter:
-            data["inValue"] += counter[key]
-        key = class_type + "-down"
-        if key in counter:
-            data["outValue"] += counter[key]
-        if data['inValue'] > 0 or data['outValue'] > 0:
-            records.append(data)
-    # write every record into database
-    for record in records:
-        body.append({
-            'camId': camId,
-            'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'type': record['class_type'],
-            'inValue': record['inValue'],
-            'outValue': record['outValue']
-        })
-    # send post request
-    try:
-        url = "http://localhost:8000/records"
-        body = json.dumps({'records': body})
-        result = requests.post(url, data=body)
-        if result.status_code != requests.codes.ok:
-            print("send request Err:" + json.loads(result.text))
-    except Exception as err:
-        print("write into DB Err:" + str(err))
+    # records = []
+    # body = []
+    # # combine all types value into list except in & out value is 0
+    # for class_type in allowed_classes:
+    #     data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
+    #     key = class_type + "-up"
+    #     if key in counter:
+    #         data["inValue"] += counter[key]
+    #     key = class_type + "-down"
+    #     if key in counter:
+    #         data["outValue"] += counter[key]
+    #     if data['inValue'] > 0 or data['outValue'] > 0:
+    #         records.append(data)
+    # # write every record into database
+    # for record in records:
+    #     body.append({
+    #         'camId': camId,
+    #         'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #         'type': record['class_type'],
+    #         'inValue': record['inValue'],
+    #         'outValue': record['outValue']
+    #     })
+    # # send post request
+    # try:
+    #     url = "http://localhost:8000/records"
+    #     body = json.dumps({'records': body})
+    #     result = requests.post(url, data=body)
+    #     if result.status_code != requests.codes.ok:
+    #         print("send request Err:" + json.loads(result.text))
+    # except Exception as err:
+    #     print("write into DB Err:" + str(err))
 
-    print("write into DB successfully! " +
+    print("write camId:{} counter into DB successfully! ".format(camId) +
           dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
@@ -139,10 +140,37 @@ def yolov4(cam):
 
 
 def check_track_direction(cam, bbox, class_name, track_id):
+    # the detection area line
+    line_pos_1 = cam.args.detect_pos - cam.args.detect_distance
+    line_pos_2 = cam.args.detect_pos + cam.args.detect_distance
+    # draw the detection area line on the screen
+    if cam.args.flow_direction == "horizontal":
+        # check detection area not over the screen
+        if line_pos_1 > cam.height or line_pos_2 > cam.height:
+            print("the detection area:{}~{} over the screen:{}".format(
+                line_pos_1, line_pos_2, cam.height))
+            return
+        cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_1),
+                 (cam.width, line_pos_1), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_2),
+                 (cam.width, line_pos_2), (255, 0, 0), 2)
+    else:
+        # check detection area not over the screen
+        if line_pos_1 > cam.width or line_pos_2 > cam.width:
+            print("the detection area:{}~{} over the screen:{}".format(
+                line_pos_1, line_pos_2, cam.width))
+            return
+        cv2.line(cam.img_handle, (line_pos_1, cam.args.detect_pos_y),
+                 (line_pos_1, cam.height), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (line_pos_2, cam.args.detect_pos_y),
+                 (line_pos_2, cam.height), (255, 0, 0), 2)
+
     # calcuate position of bbox and draw circle on
     x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
     y_cen = int(bbox[1] + (bbox[3] - bbox[1]) / 2)
-    cv2.circle(cam.img_handle, (x_cen, y_cen), 5, (255, 0, 0), -1)
+    # just for debug show the center position of object on screen
+    # cv2.circle(cam.img_handle, (x_cen, y_cen), 5, (255, 0, 0), -1)
+
     # check be tracked object on detection area
     tracked_pos = 0
     if cam.args.flow_direction == "horizontal":
@@ -285,17 +313,32 @@ def sub_process(cam):
     into the global 'img_handle', until 'thread_running' is set to False.
     then execute object detector(yolov4) and tracker(deep sort)
     """
+    fpsArr = []
     while cam.thread_running and cam.vid.isOpened():
+        start_time = time.time()
         _, cam.img_handle = cam.vid.read()
         if cam.img_handle is None:
             print("rtsp streaming has ended or failed, try again!")
             cam.vid.release()
             cam.vid = cv2.VideoCapture(cam.rtspUrl)
             continue
+        # convert to RGB
+        cam.img_handle = cv2.cvtColor(cam.img_handle, cv2.COLOR_BGR2RGB)
         # run detection by yolov4
         detections = yolov4(cam)
-        deep_sort(cam, detections)
-        counter_object(cam)
+        # deep_sort(cam, detections)
+        # counter_object(cam)
+        fps = 1.0 / (time.time() - start_time)
+        fpsArr.append(fps)
+        if len(fpsArr) == 60:
+            totalFps = 0
+            for fps in fpsArr:
+                totalFps += fps
+            totalFps /= 60
+            cv2.putText(cam.img_handle, 'FPS: {:.2f}'.format(totalFps),
+                        (200, 50), cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32),
+                        4, cv2.LINE_AA)
+            fpsArr.pop(0)
         cam.is_detected = True
 
     cam.thread_running = False
