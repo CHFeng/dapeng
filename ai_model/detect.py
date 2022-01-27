@@ -322,12 +322,18 @@ def sub_process(cam):
             cam.vid.release()
             cam.vid = cv2.VideoCapture(cam.rtspUrl)
             continue
-        # convert to RGB
-        cam.img_handle = cv2.cvtColor(cam.img_handle, cv2.COLOR_BGR2RGB)
-        # run detection by yolov4
-        detections = yolov4(cam)
-        # deep_sort(cam, detections)
-        # counter_object(cam)
+        # get current frame count
+        frameCount = int(cam.vid.get(cv2.CAP_PROP_POS_FRAMES))
+        # only execute once every 2 frames
+        if frameCount % 2 == 0:
+            # convert to RGB
+            cam.img_handle = cv2.cvtColor(cam.img_handle, cv2.COLOR_BGR2RGB)
+            # run detection by yolov4
+            detections = yolov4(cam)
+            deep_sort(cam, detections)
+            counter_object(cam)
+            cam.is_detected = True
+        # calculate FPS
         fps = 1.0 / (time.time() - start_time)
         fpsArr.append(fps)
         if len(fpsArr) == 60:
@@ -339,7 +345,6 @@ def sub_process(cam):
                         (200, 50), cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32),
                         4, cv2.LINE_AA)
             fpsArr.pop(0)
-        cam.is_detected = True
 
     cam.thread_running = False
 
