@@ -8,6 +8,8 @@ if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 import cv2
+import requests
+import json
 from detect import Detect
 from absl import app, flags, logging
 from absl.flags import FLAGS
@@ -51,24 +53,54 @@ def main(_argv):
                                              tags=[tag_constants.SERVING])
     infer = saved_model_loaded.signatures['serving_default']
 
-    rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0"
-    rtspUrl2 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0"
-    rtspUrl3 = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
-    cam = Detect(rtspUrl, infer, FLAGS)
-    cam2 = Detect(rtspUrl2, infer, FLAGS)
-    cam3 = Detect(rtspUrl3, infer, FLAGS)
+    camIds = []
+    nvrConfig = {
+        'account': 'root',
+        'password': 'root',
+        'host': '60.249.33.163'
+    }
+    # get NVR config
+    try:
+        url = "http://localhost:8000/nvr_config"
+        result = requests.get(url)
+        if result.status_code == requests.codes.ok:
+            nvrConfig = json.loads(result.text)
+        # get NVR video source
+        url = "http://localhost:8000/check_nvr"
+        result = requests.get(url)
+        if result.status_code == requests.codes.ok:
+            result = json.loads(result.text)
+            for rtsp in result["resp"]:
+                if rtsp["state"] == 'signal_restored' or rtsp[
+                        "state"] == 'connected':
+                    camIds.append(rtsp["origin"])
+    except:
+        # exit("Can't not get NVR config")
+        # just for test
+        print("Can't not get NVR config, use default value")
+        camIds = [
+            'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
+            'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
+        ]
+
+    # create AI detect according camara video source
+    cams = []
+    for camId in camIds:
+        rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(
+            nvrConfig["account"], nvrConfig["password"], nvrConfig["host"],
+            camId)
+        cam = Detect(rtspUrl, camId, infer, FLAGS)
+        cams.append(cam)
 
     camIdx = 2
     while True:
-        # '''
-        if camIdx == 0:
-            img = cam.read()
-        elif camIdx == 1:
-            img = cam2.read()
-        else:
-            img = cam3.read()
-        # '''
-        # img = cam3.read()
+        img = cams[camIdx].read()
         if img is not None:
             img = cv2.resize(img, (1280, 720))
             cv2.imshow('result', img)
@@ -82,9 +114,9 @@ def main(_argv):
             camIdx = 1
         elif key == ord("2"):
             camIdx = 2
-    cam.release()
-    cam2.release()
-    cam3.release()
+    # release thread
+    for cam in cams:
+        cam.release()
     cv2.destroyAllWindows()
 
 

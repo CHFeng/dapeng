@@ -1,4 +1,6 @@
 import cv2
+import requests
+import json
 import tensorflow as tf
 import threading
 from datetime import datetime as dt
@@ -12,6 +14,48 @@ import core.utils as utils
 from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
+
+
+def write_into_db(counter, camId, allowed_classes):
+    '''
+    將統計資料透過POST寫入DB
+    counter type is dict and key is object type & direction.
+    e.g. person-down or person-up
+    '''
+    records = []
+    body = []
+    # combine all types value into list except in & out value is 0
+    for class_type in allowed_classes:
+        data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
+        key = class_type + "-up"
+        if key in counter:
+            data["inValue"] += counter[key]
+        key = class_type + "-down"
+        if key in counter:
+            data["outValue"] += counter[key]
+        if data['inValue'] > 0 or data['outValue'] > 0:
+            records.append(data)
+    # write every record into database
+    for record in records:
+        body.append({
+            'camId': camId,
+            'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': record['class_type'],
+            'inValue': record['inValue'],
+            'outValue': record['outValue']
+        })
+    # send post request
+    try:
+        url = "http://localhost:8000/records"
+        body = json.dumps({'records': body})
+        result = requests.post(url, data=body)
+        if result.status_code != requests.codes.ok:
+            print("send request Err:" + json.loads(result.text))
+    except Exception as err:
+        print("write into DB Err:" + str(err))
+
+    print("write into DB successfully! " +
+          dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def yolov4(cam):
@@ -194,6 +238,8 @@ def deep_sort(cam, detections):
 def counter_object(cam):
     # the font scale to show object counter result on frame
     FONT_SCALE = 2
+    # the time interval(seconds) to write counter value into DB
+    WRITE_DB_INTERVAL = 5 * 60
     # define counter for every objects
     counter = {}
     for name in cam.allowed_classes:
@@ -223,6 +269,14 @@ def counter_object(cam):
                     (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0,
                     FONT_SCALE, (255, 0, 0), 1)
         idx += 1
+    # wirte data into DB every time inteval
+    diffTime = dt.now() - cam.lastWriteTime
+    if diffTime.seconds >= WRITE_DB_INTERVAL:
+        # update last time stamp
+        cam.lastWriteTime = dt.now()
+        write_into_db(counter, cam.camId, cam.allowed_classes)
+        # reset counter
+        cam.detect_objs = []
 
 
 def sub_process(cam):
@@ -248,7 +302,7 @@ def sub_process(cam):
 
 
 class Detect:
-    def __init__(self, rtspUrl, infer, args) -> None:
+    def __init__(self, rtspUrl, camId, infer, args) -> None:
         # Definition of the parameters
         max_cosine_distance = 0.4
         nn_budget = None
@@ -270,6 +324,7 @@ class Detect:
         self.vid = None
         self.width = 0
         self.height = 0
+        self.camId = camId
         # read in all class names from config
         self.class_names = utils.read_class_names(cfg.YOLO.CLASSES)
         if args.allow_classes:
