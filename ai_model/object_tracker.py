@@ -57,6 +57,19 @@ FONT_SCALE = 2
 # the time interval(seconds) to write counter value into DB
 WRITE_DB_INTERVAL = 5 * 60
 
+CUSTOM_TYPE_LIST = {
+    "truck": "TRUCK",
+    "pickup_truck": "PICKUP_TRUCK",
+    "bus": "BUS",
+    "car": "AUTOCAR",
+    "motorbike": "MOTORCYCLE",
+    "bicycle": "BIKE",
+    "ambulance": "AMBULANCE",
+    "fire_engine": "FIRE_ENGINE",
+    "police_car": "POLICE_CAR",
+    "person": "PEOPLE"
+}
+
 
 def write_into_db(counter, camId, allowed_classes):
     '''
@@ -68,7 +81,8 @@ def write_into_db(counter, camId, allowed_classes):
     body = []
     # combine all types value into list except in & out value is 0
     for class_type in allowed_classes:
-        data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
+        type = CUSTOM_TYPE_LIST[class_type]
+        data = {'class_type': type, 'inValue': 0, 'outValue': 0}
         key = class_type + "-up"
         if key in counter:
             data["inValue"] += counter[key]
