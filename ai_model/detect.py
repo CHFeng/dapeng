@@ -147,9 +147,10 @@ def check_track_direction(cam, bbox, class_name, track_id):
     if cam.args.flow_direction == "horizontal":
         # check detection area not over the screen
         if line_pos_1 > cam.height or line_pos_2 > cam.height:
-            print("the detection area:{}~{} over the screen:{}".format(
-                line_pos_1, line_pos_2, cam.height))
-            return
+            # print("the detection area:{}~{} over the screen:{}".format(
+            #     line_pos_1, line_pos_2, cam.height))
+            line_pos_1 = cam.height - cam.args.detect_distance // 2
+            line_pos_2 = cam.height + cam.args.detect_distance // 2
         cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_1),
                  (cam.width, line_pos_1), (255, 0, 0), 2)
         cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_2),
@@ -157,9 +158,10 @@ def check_track_direction(cam, bbox, class_name, track_id):
     else:
         # check detection area not over the screen
         if line_pos_1 > cam.width or line_pos_2 > cam.width:
-            print("the detection area:{}~{} over the screen:{}".format(
-                line_pos_1, line_pos_2, cam.width))
-            return
+            # print("the detection area:{}~{} over the screen:{}".format(
+            #     line_pos_1, line_pos_2, cam.width))
+            line_pos_1 = cam.width - cam.args.detect_distance // 2
+            line_pos_2 = cam.width + cam.args.detect_distance // 2
         cv2.line(cam.img_handle, (line_pos_1, cam.args.detect_pos_y),
                  (line_pos_1, cam.height), (255, 0, 0), 2)
         cv2.line(cam.img_handle, (line_pos_2, cam.args.detect_pos_y),
