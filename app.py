@@ -1,5 +1,6 @@
 import json
 import requests
+import uvicorn
 
 from typing import List, Optional
 from datetime import datetime as dt, timedelta
@@ -420,3 +421,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
         return resp(str(err))
     else:
         return resp(None, data)
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

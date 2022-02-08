@@ -1,4 +1,6 @@
 ## create virtual enviroment
+[參考](https://fastapi.tiangolo.com/zh/)
+
 利用conda建立虛擬環境
 ```
 conda create --name dapeng python==3.7
@@ -46,4 +48,17 @@ $ docker exec -it my-postgres psql -U postgres -c "\l"
 安裝python library
 ```
 pip install psycopg2
+```
+
+## Pyinstaller
+[參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
+
+使用pyinstaller將source code編譯成可執行檔
+# 安裝library
+```
+pip install pyinstaller
+```
+# 編譯
+```
+pyinstaller -F -n 編譯後的檔名 來源檔名
 ```
