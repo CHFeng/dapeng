@@ -22,25 +22,11 @@ import core.utils as utils
 
 flags.DEFINE_string("weights", "./checkpoints/yolov4-416",
                     "path to weights file")
-flags.DEFINE_integer("size", 416, "resize images to")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
-flags.DEFINE_float("iou", 0.45, "iou threshold")
-flags.DEFINE_float("score", 0.50, "score threshold")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
-flags.DEFINE_boolean("info", True, "show detailed info of tracked objects")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
                     "allowed classes")
-# the setting of object flow direction
-flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
-flags.DEFINE_integer("detect_pos", "1600",
-                     "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_x", "1480",
-                     "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_y", "0",
-                     "the position coordinate for detecting")
-flags.DEFINE_integer("detect_distance", "80", "the distance for detecting")
-flags.DEFINE_integer("object_speed", "35", "the speed of object")
 
 
 def main(_argv):
@@ -97,14 +83,14 @@ def main(_argv):
         rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(
             nvrConfig["account"], nvrConfig["password"], nvrConfig["host"],
             camId)
-        FLAGS.update(detect_config[camId])
-        cam = Detect(rtspUrl, camId, infer, FLAGS)
+        detect_config[camId]["allow_classes"] = FLAGS.allow_classes
+        cam = Detect(rtspUrl, camId, infer, detect_config[camId])
         cams.append(cam)
 
     camIdx = 0
     while True:
         img = cams[camIdx].read()
-        if img is not None:
+        if img is not None and FLAGS.dont_show == False:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.resize(img, (1280, 720))
             cv2.imshow('result', img)

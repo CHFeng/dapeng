@@ -73,8 +73,13 @@ def write_into_db(counter, camId, allowed_classes):
 
 
 def yolov4(cam):
-    nms_max_overlap = 1.0
-    input_size = cam.args.size
+    # some threshold define
+    NMS_MAX_OVERLAP = 1.0
+    RESIZE = 416
+    IOU_THRESHOLD = 0.45
+    SCORE_THRESHOLD = 0.5
+
+    input_size = RESIZE
     image_data = cv2.resize(cam.img_handle, (input_size, input_size))
     image_data = image_data / 255.0
     image_data = image_data[np.newaxis, ...].astype(np.float32)
@@ -97,8 +102,8 @@ def yolov4(cam):
             pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
         max_output_size_per_class=50,
         max_total_size=50,
-        iou_threshold=cam.args.iou,
-        score_threshold=cam.args.score,
+        iou_threshold=IOU_THRESHOLD,
+        score_threshold=SCORE_THRESHOLD,
     )
     # convert data to numpy arrays and slice out unused elements
     num_objects = valid_detections.numpy()[0]
@@ -145,7 +150,7 @@ def yolov4(cam):
     boxs = np.array([d.tlwh for d in detections])
     scores = np.array([d.confidence for d in detections])
     classes = np.array([d.class_name for d in detections])
-    indices = preprocessing.non_max_suppression(boxs, classes, nms_max_overlap,
+    indices = preprocessing.non_max_suppression(boxs, classes, NMS_MAX_OVERLAP,
                                                 scores)
     detections = [detections[i] for i in indices]
 
