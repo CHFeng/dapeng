@@ -378,7 +378,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     # conver milliseconds to date type
     start_time = dt.fromtimestamp(startTime / 1000.0)
     end_time = dt.fromtimestamp(endTime / 1000.0)
-    data = {"camera": camera, "statisticsList": []}
+    data = {"statisticsList": []}
     try:
         rows = db.get_record(camId=camera,
                              start_time=start_time,
