@@ -88,13 +88,16 @@ def main(_argv):
             'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
             'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
         ]
-
+    # read video source detect config from json file
+    with open('detect_config.json', 'r') as f:
+        detect_config = json.load(f)
     # create AI detect according camara video source
     cams = []
     for camId in camIds:
         rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(
             nvrConfig["account"], nvrConfig["password"], nvrConfig["host"],
             camId)
+        FLAGS.update(detect_config[camId])
         cam = Detect(rtspUrl, camId, infer, FLAGS)
         cams.append(cam)
 
