@@ -159,30 +159,30 @@ def yolov4(cam):
 
 def check_track_direction(cam, bbox, class_name, track_id):
     # the detection area line
-    line_pos_1 = cam.args.detect_pos - cam.args.detect_distance
-    line_pos_2 = cam.args.detect_pos + cam.args.detect_distance
+    line_pos_1 = cam.detect_pos - cam.detect_distance
+    line_pos_2 = cam.detect_pos + cam.detect_distance
     # draw the detection area line on the screen
-    if cam.args.flow_direction == "horizontal":
+    if cam.flow_direction == "horizontal":
         # check detection area not over the screen
         if line_pos_1 > cam.height or line_pos_2 > cam.height:
             # print("the detection area:{}~{} over the screen:{}".format(
             #     line_pos_1, line_pos_2, cam.height))
-            line_pos_1 = cam.height - cam.args.detect_distance // 2
-            line_pos_2 = cam.height + cam.args.detect_distance // 2
-        cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_1),
+            line_pos_1 = cam.height - cam.detect_distance // 2
+            line_pos_2 = cam.height + cam.detect_distance // 2
+        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_1),
                  (cam.width, line_pos_1), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (cam.args.detect_pos_x, line_pos_2),
+        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_2),
                  (cam.width, line_pos_2), (255, 0, 0), 2)
     else:
         # check detection area not over the screen
         if line_pos_1 > cam.width or line_pos_2 > cam.width:
             # print("the detection area:{}~{} over the screen:{}".format(
             #     line_pos_1, line_pos_2, cam.width))
-            line_pos_1 = cam.width - cam.args.detect_distance // 2
-            line_pos_2 = cam.width + cam.args.detect_distance // 2
-        cv2.line(cam.img_handle, (line_pos_1, cam.args.detect_pos_y),
+            line_pos_1 = cam.width - cam.detect_distance // 2
+            line_pos_2 = cam.width + cam.detect_distance // 2
+        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_y),
                  (line_pos_1, cam.height), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (line_pos_2, cam.args.detect_pos_y),
+        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_y),
                  (line_pos_2, cam.height), (255, 0, 0), 2)
 
     # calcuate position of bbox and draw circle on
@@ -193,18 +193,17 @@ def check_track_direction(cam, bbox, class_name, track_id):
 
     # check be tracked object on detection area
     tracked_pos = 0
-    if cam.args.flow_direction == "horizontal":
+    if cam.flow_direction == "horizontal":
         tracked_pos = y_cen
     else:
         tracked_pos = x_cen
-    if tracked_pos > (cam.args.detect_pos -
-                      cam.args.detect_distance) and tracked_pos < (
-                          cam.args.detect_pos + cam.args.detect_distance):
+    if tracked_pos > (cam.detect_pos - cam.detect_distance) and tracked_pos < (
+            cam.detect_pos + cam.detect_distance):
         checkDirection = True
-        # 當有設定cam.args.detect_pos_y or cam.args.detect_pos_x 需要物件位置大於設定值才計數
-        if cam.args.detect_pos_y > 0 and y_cen < cam.args.detect_pos_y:
+        # 當有設定cam.detect_pos_y or cam.detect_pos_x 需要物件位置大於設定值才計數
+        if cam.detect_pos_y > 0 and y_cen < cam.detect_pos_y:
             checkDirection = False
-        elif cam.args.detect_pos_x > 0 and x_cen < cam.args.detect_pos_y:
+        elif cam.detect_pos_x > 0 and x_cen < cam.detect_pos_y:
             checkDirection = False
 
         if checkDirection:
@@ -212,17 +211,17 @@ def check_track_direction(cam, bbox, class_name, track_id):
             for obj in cam.detect_objs:
                 if obj['id'] == track_id:
                     existed = True
-                    if cam.args.flow_direction == "horizontal":
+                    if cam.flow_direction == "horizontal":
                         orig_pos = obj['y_orig']
                     else:
                         orig_pos = obj['x_orig']
                     diff = tracked_pos - orig_pos
                     # check object direction if it is none
                     if obj['direction'] == "none":
-                        if diff >= cam.args.object_speed:
+                        if diff >= cam.object_speed:
                             obj['direction'] = "down"
                             orig_pos = tracked_pos
-                        elif diff <= -cam.args.object_speed:
+                        elif diff <= -cam.object_speed:
                             obj['direction'] = "up"
                             orig_pos = tracked_pos
             # to append object into array if object doesn't existd
@@ -307,7 +306,7 @@ def counter_object(cam):
         if counter[key] == 0:
             continue
         labelName = key
-        if cam.args.flow_direction == "vertical":
+        if cam.flow_direction == "vertical":
             if "up" in key:
                 labelName = key.replace("up", "IN")
             elif "down" in key:
@@ -391,8 +390,6 @@ class Detect:
         self.infer = infer
         # initialize rtsp url
         self.rtspUrl = rtspUrl
-        # initialize args
-        self.args = args
         # initialize vid
         self.vid = None
         self.width = 0
@@ -400,11 +397,19 @@ class Detect:
         self.camId = camId
         # read in all class names from config
         self.class_names = utils.read_class_names(cfg.YOLO.CLASSES)
-        if args.allow_classes:
-            self.allowed_classes = args.allow_classes.split(",")
+        if args["allow_classes"]:
+            self.allowed_classes = args["allow_classes"].split(",")
         else:
             # by default allow all classes in .names file
             self.allowed_classes = list(self.class_names.values())
+        # initialize detect config
+        self.flow_direction = args["flow_direction"]
+        self.detect_pos = args["detect_pos"]
+        self.detect_pos_x = args["detect_pos_x"]
+        self.detect_pos_y = args["detect_pos_y"]
+        self.detect_distance = args["detect_distance"]
+        self.object_speed = args["object_speed"]
+        # define some flags
         self.frame_num = 0
         self.detect_objs = []
         self.lastWriteTime = dt.now()
