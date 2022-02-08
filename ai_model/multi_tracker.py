@@ -89,20 +89,25 @@ def main(_argv):
 
     camIdx = 0
     while True:
-        img = cams[camIdx].read()
-        if img is not None and FLAGS.dont_show == False:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            img = cv2.resize(img, (1280, 720))
-            cv2.imshow('result', img)
+        if not FLAGS.dont_show:
+            img = cams[camIdx].read()
+            if img is not None:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                img = cv2.resize(img, (1280, 720))
+                cv2.imshow('result', img)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord("q"):
-            break
-        elif key >= ord("1") and key <= ord("8"):
-            camIdx = key - ord("1")
-            if camIdx >= len(camIds):
-                print("Only {} video sources".format(len(camIds)))
-                camIdx = len(camIds) - 1
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                break
+            elif key >= ord("1") and key <= ord("8"):
+                camIdx = key - ord("1")
+                if camIdx >= len(camIds):
+                    print("Only {} video sources".format(len(camIds)))
+                    camIdx = len(camIds) - 1
+        else:
+            key = input('threads are running, you can press "q" to exit!\n')
+            if key == 'q':
+                break
 
     # release thread
     for cam in cams:
