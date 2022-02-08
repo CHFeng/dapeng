@@ -23,37 +23,50 @@ def write_into_db(counter, camId, allowed_classes):
     counter type is dict and key is object type & direction.
     e.g. person-down or person-up
     '''
-    # records = []
-    # body = []
-    # # combine all types value into list except in & out value is 0
-    # for class_type in allowed_classes:
-    #     data = {'class_type': class_type, 'inValue': 0, 'outValue': 0}
-    #     key = class_type + "-up"
-    #     if key in counter:
-    #         data["inValue"] += counter[key]
-    #     key = class_type + "-down"
-    #     if key in counter:
-    #         data["outValue"] += counter[key]
-    #     if data['inValue'] > 0 or data['outValue'] > 0:
-    #         records.append(data)
-    # # write every record into database
-    # for record in records:
-    #     body.append({
-    #         'camId': camId,
-    #         'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #         'type': record['class_type'],
-    #         'inValue': record['inValue'],
-    #         'outValue': record['outValue']
-    #     })
-    # # send post request
-    # try:
-    #     url = "http://localhost:8000/records"
-    #     body = json.dumps({'records': body})
-    #     result = requests.post(url, data=body)
-    #     if result.status_code != requests.codes.ok:
-    #         print("send request Err:" + json.loads(result.text))
-    # except Exception as err:
-    #     print("write into DB Err:" + str(err))
+    CUSTOM_TYPE_LIST = {
+        "truck": "TRUCK",
+        "pickup_truck": "PICKUP_TRUCK",
+        "bus": "BUS",
+        "car": "AUTOCAR",
+        "motorbike": "MOTORCYCLE",
+        "bicycle": "BIKE",
+        "ambulance": "AMBULANCE",
+        "fire_engine": "FIRE_ENGINE",
+        "police_car": "POLICE_CAR",
+        "person": "PEOPLE"
+    }
+    records = []
+    body = []
+    # combine all types value into list except in & out value is 0
+    for class_type in allowed_classes:
+        type = CUSTOM_TYPE_LIST[class_type]
+        data = {'class_type': type, 'inValue': 0, 'outValue': 0}
+        key = class_type + "-up"
+        if key in counter:
+            data["inValue"] += counter[key]
+        key = class_type + "-down"
+        if key in counter:
+            data["outValue"] += counter[key]
+        if data['inValue'] > 0 or data['outValue'] > 0:
+            records.append(data)
+    # write every record into database
+    for record in records:
+        body.append({
+            'camId': camId,
+            'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': record['class_type'],
+            'inValue': record['inValue'],
+            'outValue': record['outValue']
+        })
+    # send post request
+    try:
+        url = "http://localhost:8000/records"
+        body = json.dumps({'records': body})
+        result = requests.post(url, data=body)
+        if result.status_code != requests.codes.ok:
+            print("send request Err:" + json.loads(result.text))
+    except Exception as err:
+        print("write into DB Err:" + str(err))
 
     print("write camId:{} counter into DB successfully! ".format(camId) +
           dt.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -309,6 +322,19 @@ def counter_object(cam):
         cam.detect_objs = []
 
 
+def calculate_fps(frame, fpsArr, start_time):
+    fps = 1.0 / (time.time() - start_time)
+    fpsArr.append(fps)
+    if len(fpsArr) == 60:
+        totalFps = 0
+        for fps in fpsArr:
+            totalFps += fps
+        totalFps /= 60
+        cv2.putText(frame, 'FPS: {:.2f}'.format(totalFps), (200, 50),
+                    cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32), 4, cv2.LINE_AA)
+        fpsArr.pop(0)
+
+
 def sub_process(cam):
     """This 'sub_process' function is designed to be run in the sub-thread.
     Once started, this thread continues to grab a new image and put it
@@ -318,9 +344,10 @@ def sub_process(cam):
     fpsArr = []
     while cam.thread_running and cam.vid.isOpened():
         start_time = time.time()
-        _, cam.img_handle = cam.vid.read()
-        if cam.img_handle is None:
-            print("rtsp streaming has ended or failed, try again!")
+        # ret, cam.img_handle = cam.vid.read()
+        ret = cam.vid.grab()
+        if not ret:
+            print("Error grabbing frame from movie! {}".format(cam.rtspUrl))
             cam.vid.release()
             cam.vid = cv2.VideoCapture(cam.rtspUrl)
             continue
@@ -328,6 +355,13 @@ def sub_process(cam):
         frameCount = int(cam.vid.get(cv2.CAP_PROP_POS_FRAMES))
         # only execute once every 2 frames
         if frameCount % 2 == 0:
+            ret, cam.img_handle = cam.vid.retrieve()
+            if not ret:
+                print("Error retrieving frame from movie! {}".format(
+                    cam.rtspUrl))
+                cam.vid.release()
+                cam.vid = cv2.VideoCapture(cam.rtspUrl)
+                continue
             # convert to RGB
             cam.img_handle = cv2.cvtColor(cam.img_handle, cv2.COLOR_BGR2RGB)
             # run detection by yolov4
@@ -335,18 +369,8 @@ def sub_process(cam):
             deep_sort(cam, detections)
             counter_object(cam)
             cam.is_detected = True
-        # calculate FPS
-        fps = 1.0 / (time.time() - start_time)
-        fpsArr.append(fps)
-        if len(fpsArr) == 60:
-            totalFps = 0
-            for fps in fpsArr:
-                totalFps += fps
-            totalFps /= 60
-            cv2.putText(cam.img_handle, 'FPS: {:.2f}'.format(totalFps),
-                        (200, 50), cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32),
-                        4, cv2.LINE_AA)
-            fpsArr.pop(0)
+            # calculate FPS
+            calculate_fps(cam.img_handle, fpsArr, start_time)
 
     cam.thread_running = False
 
