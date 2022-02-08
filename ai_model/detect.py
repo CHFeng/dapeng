@@ -345,37 +345,26 @@ def sub_process(cam):
     while cam.thread_running and cam.vid.isOpened():
         start_time = time.time()
         # ret, cam.img_handle = cam.vid.read()
-        total_frame = cam.vid.get(cv2.CAP_PROP_FRAME_COUNT)
-        for i in range(int(total_frame)):
-            ret = cam.vid.grab()
-            if not ret:
-                print("Error grabbing frame from movie! {}".format(
-                    cam.rtspUrl))
-                cam.vid.release()
-                cam.vid = cv2.VideoCapture(cam.rtspUrl)
-                continue
-            # get current frame count
-            # frameCount = int(cam.vid.get(cv2.CAP_PROP_POS_FRAMES))
-
-            # only execute once every 3 frames
-            if i % 3 == 0:
-                ret, cam.img_handle = cam.vid.retrieve()
-                if not ret:
-                    print("Error retrieving frame from movie! {}".format(
-                        cam.rtspUrl))
-                    cam.vid.release()
-                    cam.vid = cv2.VideoCapture(cam.rtspUrl)
-                    continue
-                # convert to RGB
-                cam.img_handle = cv2.cvtColor(cam.img_handle,
-                                              cv2.COLOR_BGR2RGB)
-                # run detection by yolov4
-                detections = yolov4(cam)
-                deep_sort(cam, detections)
-                counter_object(cam)
-                cam.is_detected = True
-                # calculate FPS
-                calculate_fps(cam.img_handle, fpsArr, start_time)
+        ret = cam.vid.grab()
+        if not ret:
+            print("Error grabbing frame from movie! {}".format(cam.rtspUrl))
+            cam.vid.release()
+            cam.vid = cv2.VideoCapture(cam.rtspUrl)
+            continue
+        # get current frame count
+        frameCount = int(cam.vid.get(cv2.CAP_PROP_POS_FRAMES))
+        # only execute once every 4 frames
+        if frameCount % 4 == 0:
+            ret, cam.img_handle = cam.vid.retrieve()
+            # convert to RGB
+            cam.img_handle = cv2.cvtColor(cam.img_handle, cv2.COLOR_BGR2RGB)
+            # run detection by yolov4
+            detections = yolov4(cam)
+            deep_sort(cam, detections)
+            counter_object(cam)
+            cam.is_detected = True
+            # calculate FPS
+            calculate_fps(cam.img_handle, fpsArr, start_time)
 
     cam.thread_running = False
 
