@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 # 建立一個 Fast API application
 app = FastAPI()
 # create postgres instance
@@ -379,7 +379,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     # conver milliseconds to date type
     start_time = dt.fromtimestamp(startTime / 1000.0)
     end_time = dt.fromtimestamp(endTime / 1000.0)
-    data = {"statisticsList": []}
+    statisticsList = []
     try:
         rows = db.get_record(camId=camera,
                              start_time=start_time,
@@ -411,7 +411,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
             else:
                 trafficData["traffic"] = "LIGHT"
 
-            data["statisticsList"].append(trafficData)
+            statisticsList.append(trafficData)
             # 執行下一個小時的道路狀況判定
             start = end
             # 已到達使用者指定的結束時間,結束迴圈
@@ -420,7 +420,8 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     except Exception as err:
         return resp(str(err))
     else:
-        return resp(None, data)
+        # 根據API文件設定回傳值
+        return {"code": "0", "message": "", "statisticsList": statisticsList}
 
 
 if __name__ == "__main__":
