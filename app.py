@@ -8,21 +8,13 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
-from db_postgres import Database
+from db_postgres import Database, Record
 
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.2.0"
 # 建立一個 Fast API application
 app = FastAPI()
 # create postgres instance
 db = Database()
-
-
-class Record(BaseModel):
-    camId: str
-    time: dt
-    type: str
-    inValue: int
-    outValue: int
 
 
 class Records(BaseModel):
@@ -39,9 +31,7 @@ def custom_openapi():
         description="此文件說明如何透過Restful API存取車流&人流計數的統計資料與NVR主機相關設定值的設定與存取",
         routes=app.routes,
     )
-    openapi_schema["info"]["x-logo"] = {
-        "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"
-    }
+    openapi_schema['info']['x-logo'] = {'url': "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"}
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -52,13 +42,13 @@ app.openapi = custom_openapi
 
 # API文件中定義的回傳格式
 def resp(errMsg, data=None):
-    resp = {"code": "0", "message": ""}
+    resp = {'code': "0", 'message': ""}
 
     if errMsg is not None:
-        resp["code"] = "1"
-        resp["message"] = errMsg
+        resp['code'] = "1"
+        resp['message'] = errMsg
     else:
-        resp["data"] = data
+        resp['data'] = data
 
     return resp
 
@@ -82,14 +72,13 @@ def check_health():
     try:
         url = "http://{}:{}/hosts/".format(config['host'], config['port'])
         # get domain hosts
-        result = requests.get(url,
-                              auth=(config['account'], config['password']))
-        data["nvrStatus"] = result.status_code
+        result = requests.get(url, auth=(config['account'], config['password']))
+        data['nvrStatus'] = result.status_code
         if result.status_code == requests.codes.ok:
-            data["nvrHosts"] = json.loads(result.text)
+            data['nvrHosts'] = json.loads(result.text)
     except Exception as err:
-        data["nvrStatus"] = 500
-        data["detail"] = str(err)
+        data['nvrStatus'] = 500
+        data['detail'] = str(err)
 
     return data
 
@@ -110,18 +99,16 @@ def check_nvr():
         raise HTTPException(status_code=500, detail=str(err))
 
     try:
-        url = "http://{}:{}/video-origins/".format(config['host'],
-                                                   config['port'])
+        url = "http://{}:{}/video-origins/".format(config['host'], config['port'])
         # get video source status
-        result = requests.get(url,
-                              auth=(config['account'], config['password']))
-        data["nvrStatus"] = result.status_code
+        result = requests.get(url, auth=(config['account'], config['password']))
+        data['nvrStatus'] = result.status_code
         if result.status_code == requests.codes.ok:
             resp = json.loads(result.text)
-            data["resp"] = list(resp.values())
+            data['resp'] = list(resp.values())
     except Exception as err:
-        data["nvrStatus"] = 500
-        data["detail"] = str(err)
+        data['nvrStatus'] = 500
+        data['detail'] = str(err)
 
     return data
 
@@ -142,10 +129,7 @@ def get_nvr_config():
 
 
 @app.patch("/nvr_config")
-def update_nvr_config(account: Optional[str] = None,
-                      password: Optional[str] = None,
-                      host: Optional[str] = None,
-                      port: Optional[int] = None):
+def update_nvr_config(account: Optional[str] = None, password: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
     '''
     更新NVR主機的設定值
     '''
@@ -179,14 +163,11 @@ def get_records(id: Optional[UUID] = None,
 
     data = {'statistics': {}, 'records': []}
     if start_time and not end_time:
-        raise HTTPException(status_code=422,
-                            detail="end_time could not be empty")
+        raise HTTPException(status_code=422, detail="end_time could not be empty")
     if end_time and not start_time:
-        raise HTTPException(status_code=422,
-                            detail="start_time could not be empty")
+        raise HTTPException(status_code=422, detail="start_time could not be empty")
     if start_time and end_time and start_time > end_time:
-        raise HTTPException(status_code=422,
-                            detail="start_time should be less than end_time")
+        raise HTTPException(status_code=422, detail="start_time should be less than end_time")
     try:
         if not id and not cam_id and not start_time and not end_time and not type:
             rows = db.get_all_records()
@@ -197,8 +178,8 @@ def get_records(id: Optional[UUID] = None,
         # 統計物件計數數值
         statistics = {}
         for row in rows:
-            key = row["camId"]
-            type = row["type"]
+            key = row.camId
+            type = row.type
             # 判斷此型態的物件是否存在
             if key not in statistics:
                 statistics[key] = {}
@@ -207,10 +188,10 @@ def get_records(id: Optional[UUID] = None,
                 statistics[key][type] = {'inCounter': 0, 'outCounter': 0}
 
             # 累加數據
-            statistics[key][type]['inCounter'] += row['inCounter']
-            statistics[key][type]['outCounter'] += row['outCounter']
+            statistics[key][type]['inCounter'] += row.inCounter
+            statistics[key][type]['outCounter'] += row.outCounter
 
-        data["statistics"] = statistics
+        data['statistics'] = statistics
 
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
@@ -230,12 +211,11 @@ def add_records(body: Records):
     '''
     try:
         for record in body.records:
-            db.add_record(record.camId, record.time, record.type,
-                          record.inValue, record.outValue)
+            db.add_record(record)
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     else:
-        return {"detail": "OK"}
+        return {'detail': "OK"}
 
 
 @app.delete("/record")
@@ -250,7 +230,7 @@ def delect_record(id: UUID):
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     else:
-        return {"detail": "OK"}
+        return {'detail': "OK"}
 
 
 @app.post("/camera/records")
@@ -259,7 +239,7 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
     查詢某時間段的所有攝影機記錄的資訊\n
     ● startTime(required): 開始時間 (long time to millisecond)\n
     ● endTime(required): 結束時間 (long time to millisecond)\n
-    type :\n
+    type:\n
         ALL: 全部(列出所有分類)\n
         TRUCK: 大貨車\n
         PICKUP_TRUCK: 小貨車\n
@@ -272,8 +252,8 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
         POLICE_CAR: 警察車\n
         PEOPLE: 行人\n
     Response說明:\n
-    code:執行API結果；0 = 成功，1 = 失敗\n
-    message:執行結果；成功=空字串，失敗=錯誤訊息\n
+    code: 執行API結果；0 = 成功，1 = 失敗\n
+    message: 執行結果；成功=空字串，失敗=錯誤訊息\n
     data: 回傳所有攝影機統計內容；NVR影像來源ID包含該時段的各類型總數\n
     '''
 
@@ -286,15 +266,13 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
         end_time = dt.fromtimestamp(endTime / 1000.0)
         # if type is ALL, remove type query
         if type == 'ALL': type = None
-        rows = db.get_record(start_time=start_time,
-                             end_time=end_time,
-                             type=type)
+        rows = db.get_record(start_time=start_time, end_time=end_time, type=type)
 
         # 統計物件計數數值
         statistics = {}
         for row in rows:
-            key = row["camId"]
-            type = row["type"]
+            key = row.camId
+            type = row.type
             # 判斷此型態的物件是否存在
             if key not in statistics:
                 statistics[key] = {}
@@ -303,22 +281,19 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
                 statistics[key][type] = {'inCounter': 0, 'outCounter': 0}
 
             # 累加數據
-            statistics[key][type]['inCounter'] += row['inCounter']
-            statistics[key][type]['outCounter'] += row['outCounter']
+            statistics[key][type]['inCounter'] += row.inCounter
+            statistics[key][type]['outCounter'] += row.outCounter
 
         # 轉換資料格式符合需求文件
         for key in statistics.keys():
-            row = {"camera": key, "detail": []}
+            temp = {'camera': key, 'detail': []}
             for objType in statistics[key].keys():
-                row["detail"].append({
-                    "type":
-                    objType,
-                    "inCounter":
-                    statistics[key][objType]["inCounter"],
-                    "outCounter":
-                    statistics[key][objType]["outCounter"]
+                temp['detail'].append({
+                    'type': objType,
+                    'inCounter': statistics[key][objType]['inCounter'],
+                    'outCounter': statistics[key][objType]['outCounter']
                 })
-            data.append(row)
+            data.append(temp)
     except Exception as err:
         return resp(str(err))
     else:
@@ -326,8 +301,7 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
 
 
 @app.get("/camera/traffic")
-def get_traffic(camera: str,
-                endTime: Optional[int] = int(dt.now().timestamp())):
+def get_traffic(camera: str, endTime: Optional[int] = int(dt.now().timestamp())):
     '''
     查詢即時路況\n
     ● camera: NVR影像來源ID\n
@@ -341,23 +315,21 @@ def get_traffic(camera: str,
     # 取得目前時間前五分鐘內的資料,因AI模組每5分鐘更新資料一次
     end_time = dt.fromtimestamp(endTime)
     start_time = end_time - timedelta(minutes=5)
-    data = {"camera": camera, "traffic": "LIGHT"}
+    data = {'camera': camera, 'traffic': "LIGHT"}
     try:
         # TODO 是否指定type=car?
-        rows = db.get_record(camId=camera,
-                             start_time=start_time,
-                             end_time=end_time)
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time)
         carCounter = 0
         for row in rows:
-            if row["type"] != "person":
-                carCounter += row["inCounter"]
+            if row.type != "person":
+                carCounter += row.inCounter
         # TODO 根據車速與車輛計數判斷道路狀況,目前缺少車速資訊
         if carCounter > 10:
-            data["traffic"] = "JAMMED"
+            data['traffic'] = "JAMMED"
         elif carCounter > 3:
-            data["traffic"] = "HEAVY"
+            data['traffic'] = "HEAVY"
         else:
-            data["traffic"] = "LIGHT"
+            data['traffic'] = "LIGHT"
     except Exception as err:
         return resp(str(err))
     else:
@@ -381,9 +353,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     end_time = dt.fromtimestamp(endTime / 1000.0)
     statisticsList = []
     try:
-        rows = db.get_record(camId=camera,
-                             start_time=start_time,
-                             end_time=end_time)
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time)
         # 從取得的資料中判斷每個小時的道路狀況
         start = start_time
         while True:
@@ -392,24 +362,19 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
             # 如果區間結束時間時間已經超過使用者指定的結束時間,修改區間結束時間設定為使用者指定的結束時間
             if end > end_time:
                 end = end_time
-            trafficData = {
-                "statsTime": start.timestamp() * 1000,
-                "camera": camera,
-                "traffic": "LIGHT"
-            }
+            trafficData = {'statsTime': start.timestamp() * 1000, 'camera': camera, 'traffic': "LIGHT"}
             carCounter = 0
             for row in rows:
-                if row["type"] != "person" and row["time"] > start and row[
-                        "time"] < end:
+                if row.type != "person" and row.time > start and row.time < end:
                     print("Start:{} End:{} data:{}".format(start, end, row))
-                    carCounter += row["inCounter"]
+                    carCounter += row.inCounter
             # TODO 根據車速與車輛計數判斷道路狀況,目前缺少車速資訊
             if carCounter > 10:
-                trafficData["traffic"] = "JAMMED"
+                trafficData['traffic'] = "JAMMED"
             elif carCounter > 3:
-                trafficData["traffic"] = "HEAVY"
+                trafficData['traffic'] = "HEAVY"
             else:
-                trafficData["traffic"] = "LIGHT"
+                trafficData['traffic'] = "LIGHT"
 
             statisticsList.append(trafficData)
             # 執行下一個小時的道路狀況判定
@@ -421,7 +386,7 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
         return resp(str(err))
     else:
         # 根據API文件設定回傳值
-        return {"code": "0", "message": "", "statisticsList": statisticsList}
+        return {'code': "0", 'message': "", 'statisticsList': statisticsList}
 
 
 if __name__ == "__main__":

@@ -40,13 +40,19 @@ def write_into_db(counter, camId, allowed_classes):
     # combine all types value into list except in & out value is 0
     for class_type in allowed_classes:
         type = CUSTOM_TYPE_LIST[class_type]
-        data = {'class_type': type, 'inValue': 0, 'outValue': 0}
+        data = {'class_type': type, 'inValue': 0, 'outValue': 0, 'inAvgSpeed': 0, 'outAvgSpeed': 0}
         key = class_type + "-up"
         if key in counter:
-            data["inValue"] += counter[key]
+            data['inValue'] = counter[key]
+        key = class_type + "-up-speed"
+        if key in counter:
+            data['inAvgSpeed'] = counter[key]
         key = class_type + "-down"
         if key in counter:
-            data["outValue"] += counter[key]
+            data['outValue'] = counter[key]
+        key = class_type + "-down-speed"
+        if key in counter:
+            data['outAvgSpeed'] = counter[key]
         if data['inValue'] > 0 or data['outValue'] > 0:
             records.append(data)
     # write every record into database
@@ -56,7 +62,9 @@ def write_into_db(counter, camId, allowed_classes):
             'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"),
             'type': record['class_type'],
             'inValue': record['inValue'],
-            'outValue': record['outValue']
+            'outValue': record['outValue'],
+            'inAvgSpeed': record['inAvgSpeed'],
+            'outAvgSpeed': record['outAvgSpeed'],
         })
     # send post request
     try:
@@ -68,8 +76,20 @@ def write_into_db(counter, camId, allowed_classes):
     except Exception as err:
         print("write into DB Err:" + str(err))
 
-    print("write camId:{} counter into DB successfully! ".format(camId) +
-          dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+    print("write camId:{} counter into DB successfully! ".format(camId) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
+    distance = pow((x2 - x1), 2) + pow((y2 - y1), 2)
+    distance = pow(distance, 0.5)
+    # 1 pixcel = 0.02m, FPS:20, 不確定原因需要*3才能與現實狀況相符
+    speed = (distance * 0.02) / (frameCount / 20) * 3
+    print(x1, y1, x2, y2, distance, frameCount, speed)
+    # convert speed from m/s to km/hr
+    speed = int(speed / 1000 * 3600)
+    # print("object Speed:{}".format(speed))
+    # if speed over 120, it should be wrong
+    return speed if speed < 120 else 0
 
 
 def yolov4(cam):
@@ -98,8 +118,7 @@ def yolov4(cam):
         valid_detections,
     ) = tf.image.combined_non_max_suppression(
         boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
-        scores=tf.reshape(
-            pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
+        scores=tf.reshape(pred_conf, (tf.shape(pred_conf)[0], -1, tf.shape(pred_conf)[-1])),
         max_output_size_per_class=50,
         max_total_size=50,
         iou_threshold=IOU_THRESHOLD,
@@ -141,17 +160,12 @@ def yolov4(cam):
     scores = np.delete(scores, deleted_indx, axis=0)
     # encode yolo detections and feed to tracker
     features = cam.encoder(cam.img_handle, bboxes)
-    detections = [
-        Detection(bbox, score, class_name,
-                  feature) for bbox, score, class_name, feature in zip(
-                      bboxes, scores, names, features)
-    ]
+    detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in zip(bboxes, scores, names, features)]
     # run non-maxima supression
     boxs = np.array([d.tlwh for d in detections])
     scores = np.array([d.confidence for d in detections])
     classes = np.array([d.class_name for d in detections])
-    indices = preprocessing.non_max_suppression(boxs, classes, NMS_MAX_OVERLAP,
-                                                scores)
+    indices = preprocessing.non_max_suppression(boxs, classes, NMS_MAX_OVERLAP, scores)
     detections = [detections[i] for i in indices]
 
     return detections
@@ -169,10 +183,8 @@ def check_track_direction(cam, bbox, class_name, track_id):
             #     line_pos_1, line_pos_2, cam.height))
             line_pos_1 = cam.height - cam.detect_distance // 2
             line_pos_2 = cam.height + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_1),
-                 (cam.width, line_pos_1), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_2),
-                 (cam.width, line_pos_2), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_1), (cam.width, line_pos_1), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_2), (cam.width, line_pos_2), (255, 0, 0), 2)
     else:
         # check detection area not over the screen
         if line_pos_1 > cam.width or line_pos_2 > cam.width:
@@ -180,10 +192,8 @@ def check_track_direction(cam, bbox, class_name, track_id):
             #     line_pos_1, line_pos_2, cam.width))
             line_pos_1 = cam.width - cam.detect_distance // 2
             line_pos_2 = cam.width + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_y),
-                 (line_pos_1, cam.height), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_y),
-                 (line_pos_2, cam.height), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_y), (line_pos_1, cam.height), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_y), (line_pos_2, cam.height), (255, 0, 0), 2)
 
     # calcuate position of bbox and draw circle on
     x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
@@ -197,8 +207,7 @@ def check_track_direction(cam, bbox, class_name, track_id):
         tracked_pos = y_cen
     else:
         tracked_pos = x_cen
-    if tracked_pos > (cam.detect_pos - cam.detect_distance) and tracked_pos < (
-            cam.detect_pos + cam.detect_distance):
+    if tracked_pos > (cam.detect_pos - cam.detect_distance) and tracked_pos < (cam.detect_pos + cam.detect_distance):
         checkDirection = True
         # 當有設定cam.detect_pos_y or cam.detect_pos_x 需要物件位置大於設定值才計數
         if cam.detect_pos_y > 0 and y_cen < cam.detect_pos_y:
@@ -211,6 +220,7 @@ def check_track_direction(cam, bbox, class_name, track_id):
             for obj in cam.detect_objs:
                 if obj['id'] == track_id:
                     existed = True
+                    obj['frameCount'] += 1
                     if cam.flow_direction == "horizontal":
                         orig_pos = obj['y_orig']
                     else:
@@ -224,15 +234,12 @@ def check_track_direction(cam, bbox, class_name, track_id):
                         elif diff <= -cam.object_speed:
                             obj['direction'] = "up"
                             orig_pos = tracked_pos
+                        # the direction has been detected, calculate speed
+                        if obj['direction'] != "none":
+                            obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
             # to append object into array if object doesn't existd
             if not existed:
-                obj = {
-                    "class": class_name,
-                    "id": track_id,
-                    "y_orig": y_cen,
-                    "x_orig": x_cen,
-                    "direction": "none"
-                }
+                obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
                 cam.detect_objs.append(obj)
 
 
@@ -264,8 +271,7 @@ def deep_sort(cam, detections):
             cam.img_handle,
             (int(bbox[0]), int(bbox[1] - 30)),
             (
-                int(bbox[0]) +
-                (len(class_name) + len(str(track.track_id))) * 17,
+                int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17,
                 int(bbox[1]),
             ),
             color,
@@ -292,14 +298,22 @@ def counter_object(cam):
     for name in cam.allowed_classes:
         key_up = name + "-up"
         key_down = name + "-down"
+        key_up_speed = name + "-up-speed"
+        key_down_speed = name + "-down-speed"
         counter[key_up] = 0
         counter[key_down] = 0
+        counter[key_up_speed] = 0
+        counter[key_down_speed] = 0
     # record objects direction
     for obj in cam.detect_objs:
         if obj['direction'] == "none":
             continue
         key = obj['class'] + "-" + obj['direction']
         counter[key] += 1
+        # calculate object average speed
+        if obj['speed']:
+            key = key + "-speed"
+            counter[key] = (counter[key] + obj['speed']) // 2 if counter[key] > 0 else obj['speed']
     # show object direction counter value on screen
     idx = 0
     for key in counter:
@@ -312,9 +326,8 @@ def counter_object(cam):
             elif "down" in key:
                 labelName = key.replace("down", "OUT")
         # just for debug, show result on image
-        cv2.putText(cam.img_handle, "{}:{}".format(labelName, counter[key]),
-                    (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0,
-                    FONT_SCALE, (255, 0, 0), 1)
+        cv2.putText(cam.img_handle, "{}:{}".format(labelName, counter[key]), (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0, FONT_SCALE, (255, 0, 0),
+                    1)
         idx += 1
     # wirte data into DB every time inteval
     diffTime = dt.now() - cam.lastWriteTime
@@ -334,8 +347,7 @@ def calculate_fps(frame, fpsArr, start_time):
         for fps in fpsArr:
             totalFps += fps
         totalFps /= 60
-        cv2.putText(frame, 'FPS: {:.2f}'.format(totalFps), (200, 50),
-                    cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32), 4, cv2.LINE_AA)
+        cv2.putText(frame, 'FPS: {:.2f}'.format(totalFps), (200, 50), cv2.FONT_HERSHEY_PLAIN, 3.0, (32, 32, 32), 4, cv2.LINE_AA)
         fpsArr.pop(0)
 
 
@@ -382,8 +394,7 @@ class Detect:
         model_filename = "model_data/mars-small128.pb"
         self.encoder = gdet.create_box_encoder(model_filename, batch_size=1)
         # calculate cosine distance metric
-        metric = nn_matching.NearestNeighborDistanceMetric(
-            "cosine", max_cosine_distance, nn_budget)
+        metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
         # initialize tracker
         self.tracker = Tracker(metric, max_age=120)
         # initialize yolov4
@@ -397,18 +408,18 @@ class Detect:
         self.camId = camId
         # read in all class names from config
         self.class_names = utils.read_class_names(cfg.YOLO.CLASSES)
-        if args["allow_classes"]:
-            self.allowed_classes = args["allow_classes"].split(",")
+        if args['allow_classes']:
+            self.allowed_classes = args['allow_classes'].split(",")
         else:
             # by default allow all classes in .names file
             self.allowed_classes = list(self.class_names.values())
         # initialize detect config
-        self.flow_direction = args["flow_direction"]
-        self.detect_pos = args["detect_pos"]
-        self.detect_pos_x = args["detect_pos_x"]
-        self.detect_pos_y = args["detect_pos_y"]
-        self.detect_distance = args["detect_distance"]
-        self.object_speed = args["object_speed"]
+        self.flow_direction = args['flow_direction']
+        self.detect_pos = args['detect_pos']
+        self.detect_pos_x = args['detect_pos_x']
+        self.detect_pos_y = args['detect_pos_y']
+        self.detect_distance = args['detect_distance']
+        self.object_speed = args['object_speed']
         # define some flags
         self.frame_num = 0
         self.detect_objs = []

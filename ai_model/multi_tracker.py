@@ -20,13 +20,11 @@ from tensorflow.python.saved_model import tag_constants
 # local import
 import core.utils as utils
 
-flags.DEFINE_string("weights", "./checkpoints/yolov4-416",
-                    "path to weights file")
+flags.DEFINE_string("weights", "./checkpoints/yolov4-416", "path to weights file")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
-flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike",
-                    "allowed classes")
+flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
 
 
 def main(_argv):
@@ -35,16 +33,11 @@ def main(_argv):
     config.gpu_options.allow_growth = True
     InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
-    saved_model_loaded = tf.saved_model.load(FLAGS.weights,
-                                             tags=[tag_constants.SERVING])
+    saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
     infer = saved_model_loaded.signatures['serving_default']
 
     camIds = []
-    nvrConfig = {
-        'account': 'root',
-        'password': 'root',
-        'host': '60.249.33.163'
-    }
+    nvrConfig = {'account': 'root', 'password': 'root', 'host': '60.249.33.163'}
     # get NVR config
     try:
         url = "http://localhost:8000/nvr_config"
@@ -56,10 +49,9 @@ def main(_argv):
         result = requests.get(url)
         if result.status_code == requests.codes.ok:
             result = json.loads(result.text)
-            for rtsp in result["resp"]:
-                if rtsp["state"] == 'signal_restored' or rtsp[
-                        "state"] == 'connected':
-                    camIds.append(rtsp["origin"])
+            for rtsp in result['resp']:
+                if rtsp['state'] == 'signal_restored' or rtsp['state'] == 'connected':
+                    camIds.append(rtsp['origin'])
     except:
         # exit("Can't not get NVR config")
         # just for test
@@ -80,10 +72,8 @@ def main(_argv):
     # create AI detect according camara video source
     cams = []
     for camId in camIds:
-        rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(
-            nvrConfig["account"], nvrConfig["password"], nvrConfig["host"],
-            camId)
-        detect_config[camId]["allow_classes"] = FLAGS.allow_classes
+        rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(nvrConfig['account'], nvrConfig['password'], nvrConfig['host'], camId)
+        detect_config[camId]['allow_classes'] = FLAGS.allow_classes
         cam = Detect(rtspUrl, camId, infer, detect_config[camId])
         cams.append(cam)
 
