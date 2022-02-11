@@ -59,6 +59,7 @@ pip install psycopg2
 pip install pyinstaller
 ```
 # 編譯
+[參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
 ```
 pyinstaller -F -n 編譯後的檔名 來源檔名
 ```
