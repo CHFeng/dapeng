@@ -178,18 +178,22 @@ def get_records(id: Optional[UUID] = None,
         # 統計物件計數數值
         statistics = {}
         for row in rows:
-            key = row.camId
-            type = row.type
+            key = row['camId']
+            type = row['type']
             # 判斷此型態的物件是否存在
             if key not in statistics:
                 statistics[key] = {}
                 statistics[key] = {}
             if type not in statistics[key]:
-                statistics[key][type] = {'inCounter': 0, 'outCounter': 0}
+                statistics[key][type] = {'inCounter': 0, 'outCounter': 0, 'inAvgSpeed': 0, 'outAvgSpeed': 0}
 
             # 累加數據
-            statistics[key][type]['inCounter'] += row.inCounter
-            statistics[key][type]['outCounter'] += row.outCounter
+            statistics[key][type]['inCounter'] += row['inCounter']
+            statistics[key][type]['outCounter'] += row['outCounter']
+            statistics[key][type]['inAvgSpeed'] = (statistics[key][type]['inAvgSpeed'] +
+                                                   row['inAvgSpeed']) // 2 if statistics[key][type]['inAvgSpeed'] > 0 else row['inAvgSpeed']
+            statistics[key][type]['outAvgSpeed'] = (statistics[key][type]['outAvgSpeed'] +
+                                                    row['outAvgSpeed']) // 2 if statistics[key][type]['outAvgSpeed'] > 0 else row['outAvgSpeed']
 
         data['statistics'] = statistics
 
@@ -271,8 +275,8 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
         # 統計物件計數數值
         statistics = {}
         for row in rows:
-            key = row.camId
-            type = row.type
+            key = row['camId']
+            type = row['type']
             # 判斷此型態的物件是否存在
             if key not in statistics:
                 statistics[key] = {}
@@ -281,8 +285,8 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
                 statistics[key][type] = {'inCounter': 0, 'outCounter': 0}
 
             # 累加數據
-            statistics[key][type]['inCounter'] += row.inCounter
-            statistics[key][type]['outCounter'] += row.outCounter
+            statistics[key][type]['inCounter'] += row['inCounte']
+            statistics[key][type]['outCounter'] += row['outCounter']
 
         # 轉換資料格式符合需求文件
         for key in statistics.keys():
@@ -317,16 +321,20 @@ def get_traffic(camera: str, endTime: Optional[int] = int(dt.now().timestamp()))
     start_time = end_time - timedelta(minutes=5)
     data = {'camera': camera, 'traffic': "LIGHT"}
     try:
-        # TODO 是否指定type=car?
-        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time)
+        # 指定type=AUTOCAR
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type='AUTOCAR')
         carCounter = 0
+        carSpeed = 0
         for row in rows:
-            if row.type != "person":
-                carCounter += row.inCounter
-        # TODO 根據車速與車輛計數判斷道路狀況,目前缺少車速資訊
-        if carCounter > 10:
+            if row['type'] != "person":
+                carCounter += row['inCounter']
+                if row['inAvgSpeed']:
+                    carSpeed = (carSpeed + row['inAvgSpeed']) // 2 if carSpeed else row['inAvgSpeed']
+
+        # 根據車速與車輛計數判斷道路狀況,just use speed to check
+        if carSpeed < 30:
             data['traffic'] = "JAMMED"
-        elif carCounter > 3:
+        elif carSpeed < 60:
             data['traffic'] = "HEAVY"
         else:
             data['traffic'] = "LIGHT"
@@ -353,7 +361,8 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     end_time = dt.fromtimestamp(endTime / 1000.0)
     statisticsList = []
     try:
-        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time)
+        # 指定type=AUTOCAR
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type='AUTOCAR')
         # 從取得的資料中判斷每個小時的道路狀況
         start = start_time
         while True:
@@ -364,14 +373,17 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
                 end = end_time
             trafficData = {'statsTime': start.timestamp() * 1000, 'camera': camera, 'traffic': "LIGHT"}
             carCounter = 0
+            carSpeed = 0
             for row in rows:
-                if row.type != "person" and row.time > start and row.time < end:
-                    print("Start:{} End:{} data:{}".format(start, end, row))
-                    carCounter += row.inCounter
-            # TODO 根據車速與車輛計數判斷道路狀況,目前缺少車速資訊
-            if carCounter > 10:
+                if row['type'] != "person" and row['time'] > start and row['time'] < end:
+                    carCounter += row['inCounter']
+                    if row['inAvgSpeed']:
+                        carSpeed = (carSpeed + row['inAvgSpeed']) // 2 if carSpeed else row['inAvgSpeed']
+                    print("Start:{} End:{} Data:{} Speed:{}".format(start, end, row, carSpeed))
+            # 根據車速與車輛計數判斷道路狀況,just use speed to check
+            if carSpeed < 30:
                 trafficData['traffic'] = "JAMMED"
-            elif carCounter > 3:
+            elif carSpeed < 60:
                 trafficData['traffic'] = "HEAVY"
             else:
                 trafficData['traffic'] = "LIGHT"

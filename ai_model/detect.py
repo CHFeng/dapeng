@@ -82,12 +82,12 @@ def write_into_db(counter, camId, allowed_classes):
 def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
     distance = pow((x2 - x1), 2) + pow((y2 - y1), 2)
     distance = pow(distance, 0.5)
-    # 1 pixcel = 0.02m, FPS:20, 不確定原因需要*3才能與現實狀況相符
-    speed = (distance * 0.02) / (frameCount / 20) * 3
-    print(x1, y1, x2, y2, distance, frameCount, speed)
+    # 1 pixcel = 0.02m, FPS:5, 不確定原因需要*3才能與現實狀況相符
+    speed = (distance * 0.02) / (frameCount / 5) * 3
+    # print(x1, y1, x2, y2, distance, frameCount, speed)
     # convert speed from m/s to km/hr
     speed = int(speed / 1000 * 3600)
-    # print("object Speed:{}".format(speed))
+    print("object Speed:{}".format(speed))
     # if speed over 120, it should be wrong
     return speed if speed < 120 else 0
 
