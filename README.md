@@ -54,12 +54,12 @@ pip install psycopg2
 [參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
 
 使用pyinstaller將source code編譯成可執行檔
-# 安裝library
+
+安裝library
 ```
 pip install pyinstaller
 ```
-# 編譯
-[參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
+編譯
 ```
 pyinstaller -F -n 編譯後的檔名 來源檔名
 ```
