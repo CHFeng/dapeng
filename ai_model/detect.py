@@ -82,10 +82,16 @@ def write_into_db(counter, camId, allowed_classes):
 
 
 def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
+    '''
+    速度 = 距離 / 時間
+    1 pixcel = 0.02m
+    影像來源FPS=20,因此1個frame的時間長度為1/20
+    但需要考量系統幾個frame才執行一次所以需要 X DETECTION_FRAME_RATE
+    不確定原因需要*3後的數值才能與現實狀況相符
+    '''
     distance = pow((x2 - x1), 2) + pow((y2 - y1), 2)
     distance = pow(distance, 0.5)
-    # 1 pixcel = 0.02m, FPS:20(需考量多久執行一次detection), 不確定原因需要*3才能與現實狀況相符
-    speed = (distance * 0.02) / (frameCount / 20 / DETECTION_FRAME_RATE) * 3
+    speed = (distance * 0.02) / (frameCount * (1 / 20) * DETECTION_FRAME_RATE) * 3
     # print(x1, y1, x2, y2, distance, frameCount, speed)
     # convert speed from m/s to km/hr
     speed = int(speed / 1000 * 3600)

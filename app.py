@@ -360,9 +360,9 @@ def get_traffic(camera: str, apiUrl: str, endTime: Optional[int] = int(dt.now().
                     carSpeed = (carSpeed + row['inAvgSpeed']) // 2 if carSpeed else row['inAvgSpeed']
 
         # 根據車速與車輛計數判斷道路狀況, so far we just check trafic base on speed
-        if carSpeed < 30:
+        if 0 < carSpeed < 30:
             data['traffic'] = "JAMMED"
-        elif carSpeed < 60:
+        elif 30 < carSpeed < 60:
             data['traffic'] = "HEAVY"
         else:
             data['traffic'] = "LIGHT"
@@ -410,9 +410,9 @@ def get_statistics_traffic(camera: str, apiUrl: str, startTime: int, endTime: in
                         carSpeed = (carSpeed + row['inAvgSpeed']) // 2 if carSpeed else row['inAvgSpeed']
                     print("Start:{} End:{} Data:{} Speed:{}".format(start, end, row, carSpeed))
             # 根據車速與車輛計數判斷道路狀況, so far we just check trafic base on speed
-            if carSpeed < 30:
+            if 0 < carSpeed < 30:
                 trafficData['traffic'] = "JAMMED"
-            elif carSpeed < 60:
+            elif 30 < carSpeed < 60:
                 trafficData['traffic'] = "HEAVY"
             else:
                 trafficData['traffic'] = "LIGHT"
