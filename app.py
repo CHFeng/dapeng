@@ -10,7 +10,8 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database, Record
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "3.0.0"
+POST_ERR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
 # create postgres instance
@@ -38,6 +39,37 @@ def custom_openapi():
 
 # set custom openapi
 app.openapi = custom_openapi
+
+
+# 告知斯納捷主機,NVR主機連線錯誤
+def send_err_to_web(errorCode: str, errorMsg: str):
+    '''
+    錯誤記錄通知
+    errorCode: 錯誤代碼,可由資策會提供
+        A01: NVR主機認證失敗
+        A02: NVR主機連線失敗
+    errorMsg: 錯誤訊息,真實的錯誤原因
+    time: 時間,錯誤發生時間
+    source: 來源,iii (固定)
+
+    使用情境如 : 攝影機連線nvr不成功時發送
+    '''
+    try:
+        errCodeList = {'401': 'A01', '404': 'A02', '500': 'A02'}
+        if errorCode in errCodeList:
+            errorCode = errCodeList[errorCode]
+        else:
+            errorCode = 'A02'
+        body = {'errorCode': errorCode, 'errorMsg': errorMsg, 'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"), 'source': 'iii'}
+        print(body)
+        return
+        result = requests.post(POST_ERR_URL, data=body)
+        if result.status_code != requests.codes.ok:
+            print("send error to web Err:" + json.loads(result.text))
+        else:
+            print("post error message to WEB successfully!")
+    except Exception as err:
+        print("send_err_to_web Err:" + str(err))
 
 
 # API文件中定義的回傳格式
@@ -76,9 +108,13 @@ def check_health():
         data['nvrStatus'] = result.status_code
         if result.status_code == requests.codes.ok:
             data['nvrHosts'] = json.loads(result.text)
+        else:
+            data['detail'] = result.reason
+            send_err_to_web(str(result.status_code), result.reason)
     except Exception as err:
         data['nvrStatus'] = 500
         data['detail'] = str(err)
+        send_err_to_web('500', str(err))
 
     return data
 
@@ -122,21 +158,6 @@ def get_nvr_config():
     config = {}
     try:
         config = db.get_config()
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
-    else:
-        return config
-
-
-@app.patch("/nvr_config")
-def update_nvr_config(account: Optional[str] = None, password: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
-    '''
-    更新NVR主機的設定值
-    '''
-
-    config = {}
-    try:
-        config = db.update_config(account, password, host, port)
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
     else:
@@ -238,27 +259,33 @@ def delect_record(id: UUID):
 
 
 @app.post("/camera/records")
-def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
+def get_records(startTime: int, endTime: int, apiUrl: str, EventTypes: str, type: Optional[str] = 'ALL'):
     '''
     查詢某時間段的所有攝影機記錄的資訊\n
     ● startTime(required): 開始時間 (long time to millisecond)\n
     ● endTime(required): 結束時間 (long time to millisecond)\n
-    type:\n
-        ALL: 全部(列出所有分類)\n
-        TRUCK: 大貨車\n
-        PICKUP_TRUCK: 小貨車\n
-        BUS: 公車\n
-        AUTOCAR: 自用車\n
-        MOTORCYCLE: 機車\n
-        BIKE: 腳踏車\n
-        AMBULANCE: 救護車\n
-        FIRE_ENGINE: 消防車\n
-        POLICE_CAR: 警察車\n
-        PEOPLE: 行人\n
+    ● apiUrl: NVR的URL路徑\n
+    ● EventTypes: 事件類型\n
+        LOITERING: 電子圍籬
+        STOPPED: 違停
+        ENTER: 人車量資訊
+
+    ● type:\n
+        ALL: 全部(列出所有分類)
+        TRUCK: 大貨車
+        PICKUP_TRUCK: 小貨車
+        BUS: 公車
+        AUTOCAR: 自用車
+        MOTORCYCLE: 機車
+        BIKE: 腳踏車
+        AMBULANCE: 救護車
+        FIRE_ENGINE: 消防車
+        POLICE_CAR: 警察車
+        PEOPLE: 行人
     Response說明:\n
-    code: 執行API結果；0 = 成功，1 = 失敗\n
-    message: 執行結果；成功=空字串，失敗=錯誤訊息\n
-    data: 回傳所有攝影機統計內容；NVR影像來源ID包含該時段的各類型總數\n
+    code: 執行API結果; 0 = 成功, 1 = 失敗\n
+    message: 執行結果; 成功=空字串, 失敗=錯誤訊息\n
+    data: 回傳所有攝影機統計內容;NVR影像來源ID包含該時段的各類型總數\n
     '''
 
     data = []
@@ -305,16 +332,17 @@ def get_records(startTime: int, endTime: int, type: Optional[str] = 'ALL'):
 
 
 @app.get("/camera/traffic")
-def get_traffic(camera: str, endTime: Optional[int] = int(dt.now().timestamp())):
+def get_traffic(camera: str, apiUrl: str, endTime: Optional[int] = int(dt.now().timestamp())):
     '''
     查詢即時路況\n
     ● camera: NVR影像來源ID\n
+    ● apiUrl: NVR的URL路徑\n
 
     備註:\n
     traffic:路況類型\n
-        JAMMED:壅塞(車速 < 30 & 車輛計數 > 10)\n
-        HEAVY:車多(60 < 車速 > 30 & 10 < 車輛計數 > 3)\n
-        LIGHT:順暢(車速 > 60 & 車輛計數 < 3)\n
+        JAMMED:壅塞(車速 < 30 & 車輛計數 > 10)
+        HEAVY:車多(60 < 車速 > 30 & 10 < 車輛計數 > 3)
+        LIGHT:順暢(車速 > 60 & 車輛計數 < 3)
     '''
     # 取得目前時間前五分鐘內的資料,因AI模組每5分鐘更新資料一次
     end_time = dt.fromtimestamp(endTime)
@@ -345,16 +373,17 @@ def get_traffic(camera: str, endTime: Optional[int] = int(dt.now().timestamp()))
 
 
 @app.get("/camera/statistics/traffic")
-def get_statistics_traffic(camera: str, startTime: int, endTime: int):
+def get_statistics_traffic(camera: str, apiUrl: str, startTime: int, endTime: int):
     '''
     查詢小時路況統計清單\n
     ● camera: NVR影像來源ID\n
+    ● apiUrl: NVR的URL路徑\n
 
     備註:\n
     traffic:路況類型\n
-        JAMMED:壅塞(車速 < 30 & 車輛計數 > 10)\n
-        HEAVY:車多(60 < 車速 > 30 & 10 < 車輛計數 > 3)\n
-        LIGHT:順暢(車速 > 60 & 車輛計數 < 3)\n
+        JAMMED:壅塞(車速 < 30 & 車輛計數 > 10)
+        HEAVY:車多(60 < 車速 > 30 & 10 < 車輛計數 > 3)
+        LIGHT:順暢(車速 > 60 & 車輛計數 < 3)
     '''
     # conver milliseconds to date type
     start_time = dt.fromtimestamp(startTime / 1000.0)
@@ -399,6 +428,24 @@ def get_statistics_traffic(camera: str, startTime: int, endTime: int):
     else:
         # 根據API文件設定回傳值
         return {'code': "0", 'message': "", 'statisticsList': statisticsList}
+
+
+@app.post("/nvr/modifyPwd")
+def update_nvr_config(account: Optional[str] = None, password: Optional[str] = None, deviceUrl: Optional[str] = None, port: Optional[int] = None):
+    '''
+    更新NVR主機的設定值\n
+    ● account: 帳號\n
+    ● password: 修改後的密碼 最長為10碼英數字,最少1碼英數字\n
+    ● deviceUrl: NVR主機\n
+    '''
+
+    config = {}
+    try:
+        config = db.update_config(account, password, deviceUrl, port)
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
+    else:
+        return config
 
 
 if __name__ == "__main__":

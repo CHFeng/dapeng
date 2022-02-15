@@ -136,7 +136,7 @@ class Database:
         if start_time and end_time:
             if query:
                 query += 'AND '
-            query += "time >= '{}' AND time <= '{}' ".format(start_time, end_time)
+            query += "time >= '{}' AND time < '{}' ".format(start_time, end_time)
         if type:
             if query:
                 query += 'AND '
