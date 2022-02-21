@@ -25,6 +25,7 @@ flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
+flags.DEFINE_string("output", None, "path to output video")
 
 
 def main(_argv):
@@ -76,6 +77,14 @@ def main(_argv):
         detect_config[camId]['allow_classes'] = FLAGS.allow_classes
         cam = Detect(rtspUrl, camId, infer, detect_config[camId])
         cams.append(cam)
+    # get video ready to save locally if flag is set
+    if FLAGS.output:
+        # by default VideoCapture returns float instead of int
+        fps = 20
+        codec = cv2.VideoWriter_fourcc(*"XVID")
+        out = cv2.VideoWriter(FLAGS.output, codec, fps, (1280, 720))
+    else:
+        out = None
 
     camIdx = 0
     while True:
@@ -85,7 +94,9 @@ def main(_argv):
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 img = cv2.resize(img, (1280, 720))
                 cv2.imshow('result', img)
-
+                # if output flag is set, save video file
+                if FLAGS.output:
+                    out.write(img)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
