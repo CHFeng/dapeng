@@ -47,6 +47,7 @@ flags.DEFINE_boolean("frame_debug", False, "show frame one by one for debug")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
 # NVR video source index
 flags.DEFINE_integer("video_idx", "2", "the NVR video source index")
+flags.DEFINE_boolean("cut_img", False, "cut object image when detected")
 # the font scale to show object counter result on frame
 FONT_SCALE = 2
 # the time interval(seconds) to write counter value into DB
@@ -105,8 +106,9 @@ def write_into_db(counter, camId, allowed_classes):
     # send post request
     try:
         url = "http://localhost:8000/records"
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
         body = json.dumps({'records': body})
-        result = requests.post(url, data=body)
+        result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             print("send request Err:" + json.loads(result.text))
     except Exception as err:
@@ -120,12 +122,24 @@ def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
     distance = pow(distance, 0.5)
     # 1 pixcel = 0.02m, FPS:20, 不確定原因需要*3才能與現實狀況相符
     speed = (distance * 0.02) / (frameCount / 20) * 3
-    print(x1, y1, x2, y2, distance, frameCount, speed)
+    # print(x1, y1, x2, y2, distance, frameCount, speed)
     # convert speed from m/s to km/hr
     speed = int(speed / 1000 * 3600)
     # print("object Speed:{}".format(speed))
     # if speed over 120, it should be wrong
     return speed if speed < 120 else 0
+
+
+def cut_detect_object(frame, bbox, object_type, index):
+    try:
+        now = dt.now().strftime("%Y-%m-%d %H:%M:%S")
+        left, top, right, bottom = bbox
+        cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
+        filePath = "./detection_images/{}/{}-{}.png".format(object_type, now, index)
+        # print("top:{} left:{} right:{} bottom:{} filePath:{}".format(top, left, right, bottom, filePath))
+        cv2.imwrite(filePath, cut_img)
+    except Exception as err:
+        print("cut_detect_object Err:" + str(err))
 
 
 def main(_argv):
@@ -146,8 +160,9 @@ def main(_argv):
     except:
         # exit("Can't not get NVR config")
         # just for test
+        camId = "DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
         print("Can't not get NVR config, use default rtsp url")
-        rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
+        rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/" + camId
     # Definition of the parameters
     max_cosine_distance = 0.4
     nn_budget = None
@@ -196,6 +211,10 @@ def main(_argv):
     frame_num = 0
     detect_objs = []
     lastWriteTime = dt.now()
+    # when cut_img is true, disable info
+    if FLAGS.cut_img:
+        print("cut_img flag is enabled! disable info flag!")
+        FLAGS.info = False
     # while video is running
     while vid.isOpened():
         start_time = time.time()
@@ -257,15 +276,17 @@ def main(_argv):
             if line_pos_1 > height or line_pos_2 > height:
                 print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, height))
                 break
-            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_1), (width, line_pos_1), (255, 0, 0), 2)
-            cv2.line(frame, (FLAGS.detect_pos_x, line_pos_2), (width, line_pos_2), (255, 0, 0), 2)
+            if FLAGS.info:
+                cv2.line(frame, (FLAGS.detect_pos_x, line_pos_1), (width, line_pos_1), (255, 0, 0), 2)
+                cv2.line(frame, (FLAGS.detect_pos_x, line_pos_2), (width, line_pos_2), (255, 0, 0), 2)
         else:
             # check detection area not over the screen
             if line_pos_1 > width or line_pos_2 > width:
                 print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, width))
                 break
-            cv2.line(frame, (line_pos_1, FLAGS.detect_pos_y), (line_pos_1, height), (255, 0, 0), 2)
-            cv2.line(frame, (line_pos_2, FLAGS.detect_pos_y), (line_pos_2, height), (255, 0, 0), 2)
+            if FLAGS.info:
+                cv2.line(frame, (line_pos_1, FLAGS.detect_pos_y), (line_pos_1, height), (255, 0, 0), 2)
+                cv2.line(frame, (line_pos_2, FLAGS.detect_pos_y), (line_pos_2, height), (255, 0, 0), 2)
         # loop through objects and use class index to get class name, allow only classes in allowed_classes list
         names = []
         deleted_indx = []
@@ -309,38 +330,40 @@ def main(_argv):
             class_name = track.get_class()
 
             # draw bbox on screen
-            color = colors[int(track.track_id) % len(colors)]
-            color = [i * 255 for i in color]
-            cv2.rectangle(
-                frame,
-                (int(bbox[0]), int(bbox[1])),
-                (int(bbox[2]), int(bbox[3])),
-                color,
-                2,
-            )
-            cv2.rectangle(
-                frame,
-                (int(bbox[0]), int(bbox[1] - 30)),
-                (
-                    int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17,
-                    int(bbox[1]),
-                ),
-                color,
-                -1,
-            )
-            cv2.putText(
-                frame,
-                class_name + "-" + str(track.track_id),
-                (int(bbox[0]), int(bbox[1] - 10)),
-                0,
-                0.75,
-                (255, 255, 255),
-                2,
-            )
+            if FLAGS.info:
+                color = colors[int(track.track_id) % len(colors)]
+                color = [i * 255 for i in color]
+                cv2.rectangle(
+                    frame,
+                    (int(bbox[0]), int(bbox[1])),
+                    (int(bbox[2]), int(bbox[3])),
+                    color,
+                    2,
+                )
+                cv2.rectangle(
+                    frame,
+                    (int(bbox[0]), int(bbox[1] - 30)),
+                    (
+                        int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17,
+                        int(bbox[1]),
+                    ),
+                    color,
+                    -1,
+                )
+                cv2.putText(
+                    frame,
+                    class_name + "-" + str(track.track_id),
+                    (int(bbox[0]), int(bbox[1] - 10)),
+                    0,
+                    0.75,
+                    (255, 255, 255),
+                    2,
+                )
             # calcuate position of bbox and draw circle on
             x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
             y_cen = int(bbox[1] + (bbox[3] - bbox[1]) / 2)
-            cv2.circle(frame, (x_cen, y_cen), 5, (255, 0, 0), -1)
+            if FLAGS.info:
+                cv2.circle(frame, (x_cen, y_cen), 5, (255, 0, 0), -1)
             # check be tracked object on detection area
             tracked_pos = 0
             if FLAGS.flow_direction == "horizontal":
@@ -380,6 +403,7 @@ def main(_argv):
                                 # the direction has been detected, calculate speed
                                 if obj['direction'] != "none":
                                     obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
+                                    cut_detect_object(frame, bbox, class_name, track.track_id)
                     # to append object into array if object doesn't existd
                     if not existed:
                         obj = {
@@ -448,7 +472,7 @@ def main(_argv):
         if diffTime.seconds >= WRITE_DB_INTERVAL:
             # update last time stamp
             lastWriteTime = dt.now()
-            write_into_db(counter, camId, allowed_classes)
+            # write_into_db(counter, camId, allowed_classes)
             # reset counter
             detect_objs = []
 
