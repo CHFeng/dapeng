@@ -71,8 +71,9 @@ def write_into_db(counter, camId, allowed_classes):
     # send post request
     try:
         url = "http://localhost:8000/records"
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
         body = json.dumps({'records': body})
-        result = requests.post(url, data=body)
+        result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             print("send request Err:" + json.loads(result.text))
     except Exception as err:
