@@ -496,11 +496,18 @@ class Detect:
 
         Returns None if the camera runs out of image or error.
         """
-        if not self.is_opened or not self.is_detected:
-            return None
-        self.is_detected = False
+        if self.thread_running:
+            if not self.is_opened or not self.is_detected:
+                return None
+            self.is_detected = False
 
-        return self.img_handle
+            return self.img_handle
+        else:
+            print("self.thread_running is false!!")
+            self.vid.release()
+            self._open()
+
+        return None
 
     def release(self):
         self._stop()
