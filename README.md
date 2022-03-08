@@ -65,7 +65,9 @@ pyinstaller -F -n 編譯後的檔名 來源檔名
 ```
 
 ## PM2管理服務
-[參考](https://pm2.keymetrics.io/docs/usage/quick-start/)
+* [PM2-官方](https://pm2.keymetrics.io/docs/usage/quick-start/)
+* [參考](https://tn710617.github.io/zh-tw/pm2/)
+
 先安裝node LTS版本
 ```
 sudo apt-get install curl
