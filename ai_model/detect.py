@@ -443,6 +443,7 @@ class Detect:
         self.lastWriteTime = dt.now()
         self.thread_running = False
         self.is_detected = False
+        self.is_opened = False
         self._open()  # try to open the camera
 
     def _open(self):
@@ -503,11 +504,9 @@ class Detect:
 
             return self.img_handle
         else:
-            print("self.thread_running is false!!")
             self.vid.release()
-            self._open()
-
-        return None
+            err_msg = "RTSP url {} is failed".format(self.rtspUrl)
+            raise RuntimeError(err_msg)
 
     def release(self):
         self._stop()

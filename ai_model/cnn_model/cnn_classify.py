@@ -31,7 +31,7 @@ def detect_car_classified(frame, orig_type):
     confArr = model.predict(car_img)[0]  # model.predict return a 2D matrix, ex: [[9.9993384e-01 7.4850512e-05]]
     # get label with max accuracy
     idx = np.argmax(confArr)
-    print("orig_type:{} new_type:{} conf:{:.2f}%".format(orig_type, classes[idx], confArr[idx] * 100))
+    # print("orig_type:{} new_type:{} conf:{:.2f}%".format(orig_type, classes[idx], confArr[idx] * 100))
     # 只有信心度超過85%才會替換成辨識出來的,否則保持原本的類別
     if confArr[idx] >= 0.85:
         return classes[idx]

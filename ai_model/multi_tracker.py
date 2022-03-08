@@ -13,6 +13,7 @@ import json
 from detect import Detect
 from absl import app, flags, logging
 from absl.flags import FLAGS
+from datetime import datetime as dt
 # tensoflow
 from tensorflow.compat.v1 import InteractiveSession
 from tensorflow.compat.v1 import ConfigProto
@@ -88,6 +89,7 @@ def main(_argv):
         out = None
 
     camIdx = 0
+    start_time = dt.now()
     while True:
         if not FLAGS.dont_show:
             img = cams[camIdx].read()
@@ -107,9 +109,15 @@ def main(_argv):
                     print("Only {} video sources".format(len(camIds)))
                     camIdx = len(camIds) - 1
         else:
-            key = input('threads are running, you can press "q" to exit!\n')
-            if key == 'q':
-                break
+            # key = input('threads are running, you can press "q" to exit!\n')
+            # if key == 'q':
+            #     break
+            # trigger read every 30 seconds to make sure thread is running
+            diffTime = dt.now() - start_time
+            if diffTime.seconds >= 30:
+                for cam in cams:
+                    cam.read()
+                start_time = dt.now()
 
     # release thread
     for cam in cams:
