@@ -1,3 +1,4 @@
+import os
 import cv2
 import requests
 import json
@@ -407,7 +408,7 @@ class Detect:
         max_cosine_distance = 0.4
         nn_budget = None
         # initialize deep sort
-        model_filename = "model_data/mars-small128.pb"
+        model_filename = os.path.join(os.getcwd(), "ai_model", "model_data/mars-small128.pb")
         self.encoder = gdet.create_box_encoder(model_filename, batch_size=1)
         # calculate cosine distance metric
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)

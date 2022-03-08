@@ -28,7 +28,8 @@ from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
 
-flags.DEFINE_string("weights", "./checkpoints/yolov4-416", "path to weights file")
+YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "checkpoints/yolov4-416")
+flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_integer("size", 416, "resize images to")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
@@ -135,7 +136,7 @@ def cut_detect_object(frame, bbox, object_type, index):
         now = dt.now().strftime("%Y-%m-%d %H:%M:%S")
         left, top, right, bottom = bbox
         cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
-        filePath = "./detection_images/{}/{}-{}.png".format(object_type, now, index)
+        filePath = os.path(os.getcwd(), "ai_model", "detection_images/{}/{}-{}.png".format(object_type, now, index))
         # print("top:{} left:{} right:{} bottom:{} filePath:{}".format(top, left, right, bottom, filePath))
         cv2.imwrite(filePath, cut_img)
     except Exception as err:
@@ -169,7 +170,7 @@ def main(_argv):
     nms_max_overlap = 1.0
 
     # initialize deep sort
-    model_filename = "model_data/mars-small128.pb"
+    model_filename = os.path.join(os.getcwd(), "ai_model", "model_data/mars-small128.pb")
     encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # calculate cosine distance metric
     metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)

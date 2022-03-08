@@ -20,7 +20,8 @@ from tensorflow.python.saved_model import tag_constants
 # local import
 import core.utils as utils
 
-flags.DEFINE_string("weights", "./checkpoints/yolov4-416", "path to weights file")
+YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "checkpoints/yolov4-416")
+flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
@@ -68,7 +69,7 @@ def main(_argv):
             'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
         ]
     # read video source detect config from json file
-    with open('detect_config.json', 'r') as f:
+    with open(os.path.join(os.getcwd(), "ai_model", "detect_config.json"), 'r') as f:
         detect_config = json.load(f)
     # create AI detect according camara video source
     cams = []
