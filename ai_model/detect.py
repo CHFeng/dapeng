@@ -15,8 +15,8 @@ import core.utils as utils
 from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
-# cnn model
-from cnn_model.cnn_model import detect_car_classified
+# cnn detect model
+from cnn_model.cnn_classify import detect_car_classified
 
 DETECTION_FRAME_RATE = 4
 
@@ -248,12 +248,11 @@ def check_track_direction(cam, bbox, class_name, track_id):
                         # the direction has been detected, calculate speed
                         if obj['direction'] != "none":
                             obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
-                            # 決定什麼類型的物件要進一步識別(路口的監視器畫面判別為人其實是機車)
-                            # 正常狀況下只有車輛須要進一步判別是否為特殊車種
-                            if class_name != "person":
+                            # 只有原本判斷為car or truck會需要進一步分類
+                            if class_name == "car" or class_name == "truck":
                                 left, top, right, bottom = bbox
                                 cut_img = cv2.cvtColor(cam.img_handle[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
-                                class_name = detect_car_classified(cut_img)
+                                class_name = detect_car_classified(cut_img, class_name)
             # to append object into array if object doesn't existd
             if not existed:
                 obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}

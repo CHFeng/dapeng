@@ -5,3 +5,5 @@ yolov4-416
 build
 detection_images
 *.png
+*.h5
+*.log
