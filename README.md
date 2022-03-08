@@ -63,3 +63,21 @@ pip install pyinstaller
 ```
 pyinstaller -F -n 編譯後的檔名 來源檔名
 ```
+
+## PM2管理服務
+[參考](https://pm2.keymetrics.io/docs/usage/quick-start/)
+先安裝node LTS版本
+```
+sudo apt-get install curl
+curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+```
+成功新增Node.js PPA後，就可以執行下個步驟，安裝Node.js.
+```
+sudo apt-get install nodejs
+```
+輸入以下指令檢查你安裝的版本/狀態，若安裝成功就會直接顯示出目前系統上的版本號.
+```
+node -v
+npm -v
+```
+我們使用ecosystem.config.js來設定要啟動的服務與相關參數
