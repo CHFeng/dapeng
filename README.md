@@ -82,4 +82,8 @@ sudo apt-get install nodejs
 node -v
 npm -v
 ```
+安裝pm2
+```
+sudo npm install pm2 -g
+```
 我們使用ecosystem.config.js來設定要啟動的服務與相關參數
