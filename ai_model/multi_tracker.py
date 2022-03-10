@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+
+import signal
+import sys
 import os
 import tensorflow as tf
 # comment out below line to enable tensorflow logging outputs
@@ -27,6 +31,16 @@ flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
 flags.DEFINE_string("output", None, "path to output video")
+
+isPressCtrlC = False
+
+
+# ctrl+c handler
+def signal_handler(signal_num, frame):
+    if signal_num == signal.SIGINT.value:
+        global isPressCtrlC
+        print('To Close all threads now!')
+        isPressCtrlC = True
 
 
 def main(_argv):
@@ -88,7 +102,9 @@ def main(_argv):
 
     camIdx = 0
     start_time = dt.now()
+    print("Start detection procedure now!")
     while True:
+        if isPressCtrlC: break
         if not FLAGS.dont_show:
             img = cams[camIdx].read()
             if img is not None:
@@ -107,25 +123,25 @@ def main(_argv):
                     print("Only {} video sources".format(len(camIds)))
                     camIdx = len(camIds) - 1
         else:
-            # key = input('threads are running, you can press "q" to exit!\n')
-            # if key == 'q':
-            #     break
             # trigger read every 30 seconds to make sure thread is running
             diffTime = dt.now() - start_time
             if diffTime.seconds >= 30:
-                print("check video is alive")
                 for cam in cams:
                     cam.read()
                 start_time = dt.now()
 
-    # release thread
+    # release all threads
     for cam in cams:
         cam.release()
+    # release cv2
     cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
     try:
+        # register ctrl+c signal handler to close sub thread
+        signal.signal(signal.SIGINT, signal_handler)
+        # run main
         app.run(main)
     except SystemExit:
         pass

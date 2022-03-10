@@ -505,7 +505,7 @@ class Detect:
     def _stop(self):
         if self.thread_running:
             self.thread_running = False
-            print('Wait until Thread is terminating')
+            print('Wait until thread is terminated')
             self.thread.join()
 
     def read(self):
