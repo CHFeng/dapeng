@@ -272,7 +272,7 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                             cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
                         # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
-                        if config['notify']:
+                        if 'notify' in config and config['notify']:
                             notify_web()
         # to append object into array if object doesn't existd
         if not existed:

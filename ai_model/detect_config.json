@@ -7,7 +7,8 @@
             "pos_start": 700,
             "pos_end": 1200,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         },{
             "direction":"vertical",
             "pos": 1400,
@@ -26,7 +27,8 @@
             "pos_start": 0,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0":{
@@ -37,7 +39,8 @@
             "pos_start": 1480,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0":{
@@ -48,7 +51,8 @@
             "pos_start": 0,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0":{
@@ -59,7 +63,8 @@
             "pos_start": 1480,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0":{
@@ -70,7 +75,8 @@
             "pos_start": 0,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0":{
@@ -81,7 +87,8 @@
             "pos_start": 0,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0":{
@@ -92,7 +99,8 @@
             "pos_start": 0,
             "pos_end": 0,
             "distance": 80,
-            "speed": 35
+            "speed": 35,
+            "notify": false
         }]
     }
 }
