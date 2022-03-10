@@ -162,8 +162,8 @@ def main(_argv):
         # exit("Can't not get NVR config")
         # just for test
         camId = "DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
-        print("Can't not get NVR config, use default rtsp url")
         rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/" + camId
+        print("Can't not get NVR config, use default rtsp url:{}".format(rtspUrl))
     # Definition of the parameters
     max_cosine_distance = 0.4
     nn_budget = None
@@ -195,9 +195,15 @@ def main(_argv):
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print("The width:{} height:{}".format(width, height))
-    # 若偵測範圍的結束點為0,根據偵測方向為水平或垂直設定結束座標為影像的寬或長
-    if FLAGS.detect_pos_end == 0:
-        FLAGS.detect_pos_end = width if FLAGS.flow_direction == "horizontal" else height
+    # 根據偵測方向為水平或垂直檢查結束座標數值是否正確
+    if FLAGS.flow_direction == "horizontal":
+        if FLAGS.detect_pos_end == 0 or FLAGS.detect_pos_end > width:
+            FLAGS.detect_pos_end = width
+            print("the detect pos_end has been updated to:{}".format(FLAGS.detect_pos_end))
+    else:
+        if FLAGS.detect_pos_end == 0 or FLAGS.detect_pos_end > height:
+            FLAGS.detect_pos_end = height
+            print("the detect pos_end has been updated to:{}".format(FLAGS.detect_pos_end))
 
     # read in all class names from config
     class_names = utils.read_class_names(cfg.YOLO.CLASSES)

@@ -26,7 +26,6 @@ flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
-flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
 flags.DEFINE_string("output", None, "path to output video")
 
 
@@ -76,7 +75,6 @@ def main(_argv):
     cams = []
     for camId in camIds:
         rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(nvrConfig['account'], nvrConfig['password'], nvrConfig['host'], camId)
-        detect_config[camId]['allow_classes'] = FLAGS.allow_classes
         cam = Detect(rtspUrl, camId, infer, detect_config[camId])
         cams.append(cam)
     # get video ready to save locally if flag is set
@@ -115,6 +113,7 @@ def main(_argv):
             # trigger read every 30 seconds to make sure thread is running
             diffTime = dt.now() - start_time
             if diffTime.seconds >= 30:
+                print("check video is alive")
                 for cam in cams:
                     cam.read()
                 start_time = dt.now()

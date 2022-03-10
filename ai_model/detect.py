@@ -90,7 +90,7 @@ def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
     速度 = 距離 / 時間
     1 pixcel = 0.02m
     影像來源FPS=20,因此1個frame的時間長度為1/20
-    但需要考量系統幾個frame才執行一次所以需要 X DETECTION_FRAME_RATE
+    但需要考量系統幾個frame才執行一次所以需要 * DETECTION_FRAME_RATE
     不確定原因需要*3後的數值才能與現實狀況相符
     '''
     distance = pow((x2 - x1), 2) + pow((y2 - y1), 2)
@@ -105,6 +105,9 @@ def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
 
 
 def yolov4(cam):
+    '''
+    使用yolov4偵測畫面中的物件
+    '''
     # some threshold define
     NMS_MAX_OVERLAP = 1.0
     RESIZE = 416
@@ -152,9 +155,7 @@ def yolov4(cam):
     # store all predictions in one parameter for simplicity when calling functions
     pred_bbox = [bboxes, scores, classes, num_objects]
     # just for debug
-    # cam.img_handle = utils.draw_bbox(cam.img_handle,
-    #                                  pred_bbox,
-    #                                  classes=cam.class_names)
+    # cam.img_handle = utils.draw_bbox(cam.img_handle, pred_bbox, classes=cam.class_names)
     # loop through objects and use class index to get class name, allow only classes in allowed_classes list
     names = []
     deleted_indx = []
@@ -183,71 +184,64 @@ def yolov4(cam):
     return detections
 
 
-def check_track_direction(cam, bbox, class_name, track_id):
+def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs):
+    '''
+    偵測物件移動的方向
+    如果偵測區間設定為水平(horizontal),則物件往下移動(X變大),則位移方向判定為down
+    如果偵測區間設定為垂直(vertical),則物件往右移動(Y變大),則位移方向判定為down
+    '''
     # the detection area line
-    line_pos_1 = cam.detect_pos - cam.detect_distance
-    line_pos_2 = cam.detect_pos + cam.detect_distance
+    line_pos_1 = config['pos'] - config['distance']
+    line_pos_2 = config['pos'] + config['distance']
     # draw the detection area line on the screen
-    if cam.flow_direction == "horizontal":
-        # check detection area not over the screen
-        if line_pos_1 > cam.height or line_pos_2 > cam.height:
-            # print("the detection area:{}~{} over the screen:{}".format(
-            #     line_pos_1, line_pos_2, cam.height))
-            line_pos_1 = cam.height - cam.detect_distance // 2
-            line_pos_2 = cam.height + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (cam.detect_pos_start, line_pos_1), (cam.detect_pos_end, line_pos_1), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (cam.detect_pos_start, line_pos_2), (cam.detect_pos_end, line_pos_2), (255, 0, 0), 2)
+    if config['direction'] == "horizontal":
+        cv2.line(frame, (config['pos_start'], line_pos_1), (config['pos_end'], line_pos_1), (255, 0, 0), 2)
+        cv2.line(frame, (config['pos_start'], line_pos_2), (config['pos_end'], line_pos_2), (255, 0, 0), 2)
     else:
-        # check detection area not over the screen
-        if line_pos_1 > cam.width or line_pos_2 > cam.width:
-            # print("the detection area:{}~{} over the screen:{}".format(
-            #     line_pos_1, line_pos_2, cam.width))
-            line_pos_1 = cam.width - cam.detect_distance // 2
-            line_pos_2 = cam.width + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_start), (line_pos_1, cam.detect_pos_end), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_start), (line_pos_2, cam.detect_pos_end), (255, 0, 0), 2)
+        cv2.line(frame, (line_pos_1, config['pos_start']), (line_pos_1, config['pos_end']), (255, 0, 0), 2)
+        cv2.line(frame, (line_pos_2, config['pos_start']), (line_pos_2, config['pos_end']), (255, 0, 0), 2)
 
     # calcuate position of bbox and draw circle on
     x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
     y_cen = int(bbox[1] + (bbox[3] - bbox[1]) / 2)
     # just for debug show the center position of object on screen
-    # cv2.circle(cam.img_handle, (x_cen, y_cen), 5, (255, 0, 0), -1)
+    cv2.circle(frame, (x_cen, y_cen), 5, (255, 0, 0), -1)
 
     # check be tracked object on detection area
     checkDirection = False
     tracked_pos = 0
-    if cam.flow_direction == "horizontal":
+    if config['direction'] == "horizontal":
         # 當有偵測方向為horizontal(水平)判斷物件位置y在cam.detect_pos與cam.detect_distance範圍之間
         # x在detect_pos_start與detect_pos_end之間
-        if cam.detect_pos_start < x_cen < cam.detect_pos_end and \
-         (cam.detect_pos - cam.detect_distance) < y_cen < (cam.detect_pos + cam.detect_distance):
+        if config['pos_start'] < x_cen < config['pos_end'] and \
+         (config['pos'] - config['distance']) < y_cen < (config['pos'] + config['distance']):
             checkDirection = True
             tracked_pos = y_cen
     else:
         # 當有偵測方向為vertical(垂直)判斷物件位置x在cam.detect_pos與cam.detect_distance範圍之間
         # y在detect_pos_start與detect_pos_end之間
-        if cam.detect_pos_start < y_cen < cam.detect_pos_end and \
-            (cam.detect_pos - cam.detect_distance) < x_cen < (cam.detect_pos + cam.detect_distance):
+        if config['pos_start'] < y_cen < config['pos_end'] and \
+            (config['pos'] - config['distance']) < x_cen < (config['pos'] + config['distance']):
             checkDirection = True
             tracked_pos = x_cen
 
     if checkDirection:
         existed = False
-        for obj in cam.detect_objs:
+        for obj in detect_objs:
             if obj['id'] == track_id:
                 existed = True
                 obj['frameCount'] += 1
-                if cam.flow_direction == "horizontal":
+                if config['direction'] == "horizontal":
                     orig_pos = obj['y_orig']
                 else:
                     orig_pos = obj['x_orig']
                 diff = tracked_pos - orig_pos
                 # check object direction if it is none
                 if obj['direction'] == "none":
-                    if diff >= cam.object_speed:
+                    if diff >= config['speed']:
                         obj['direction'] = "down"
                         orig_pos = tracked_pos
-                    elif diff <= -cam.object_speed:
+                    elif diff <= -config['speed']:
                         obj['direction'] = "up"
                         orig_pos = tracked_pos
                     # the direction has been detected, calculate speed
@@ -256,15 +250,18 @@ def check_track_direction(cam, bbox, class_name, track_id):
                         # 只有原本判斷為car or truck會需要進一步分類
                         if class_name == "car" or class_name == "truck":
                             left, top, right, bottom = bbox
-                            cut_img = cv2.cvtColor(cam.img_handle[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
+                            cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
         # to append object into array if object doesn't existd
         if not existed:
             obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
-            cam.detect_objs.append(obj)
+            detect_objs.append(obj)
 
 
 def deep_sort(cam, detections):
+    '''
+    使用deep sort演算法判斷連續畫面中的物件
+    '''
     # Call the tracker
     cam.tracker.predict()
     cam.tracker.update(detections)
@@ -277,7 +274,8 @@ def deep_sort(cam, detections):
             continue
         bbox = track.to_tlbr()
         class_name = track.get_class()
-        check_track_direction(cam, bbox, class_name, track.track_id)
+        for config in cam.detect_configs:
+            check_track_direction(cam.img_handle, bbox, class_name, track.track_id, config, cam.detect_objs)
         # draw bbox on screen, just for debug
         color = colors[int(track.track_id) % len(colors)]
         color = [i * 255 for i in color]
@@ -341,11 +339,11 @@ def counter_object(cam):
         if counter[key] == 0:
             continue
         labelName = key
-        if cam.flow_direction == "vertical":
-            if "up" in key:
-                labelName = key.replace("up", "IN")
-            elif "down" in key:
-                labelName = key.replace("down", "OUT")
+        # if cam.flow_direction == "vertical":
+        #     if "up" in key:
+        #         labelName = key.replace("up", "IN")
+        #     elif "down" in key:
+        #         labelName = key.replace("down", "OUT")
         # just for debug, show result on image
         cv2.putText(cam.img_handle, "{}:{}".format(labelName, counter[key]), (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0, FONT_SCALE, (255, 0, 0),
                     1)
@@ -416,8 +414,8 @@ class Detect:
         self.encoder = gdet.create_box_encoder(model_filename, batch_size=1)
         # calculate cosine distance metric
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
-        # initialize tracker
-        self.tracker = Tracker(metric, max_age=120)
+        # initialize tracker,物件消失5秒後移除追蹤, 物件只要出現一次就開始追蹤
+        self.tracker = Tracker(metric, max_age=DETECTION_FRAME_RATE * 5, n_init=1)
         # initialize yolov4
         self.infer = infer
         # initialize rtsp url
@@ -435,12 +433,7 @@ class Detect:
             # by default allow all classes in .names file
             self.allowed_classes = list(self.class_names.values())
         # initialize detect config
-        self.flow_direction = args['flow_direction']
-        self.detect_pos = args['detect_pos']
-        self.detect_pos_start = args['detect_pos_start']
-        self.detect_pos_end = args['detect_pos_end']
-        self.detect_distance = args['detect_distance']
-        self.object_speed = args['object_speed']
+        self.detect_configs = args['detect_configs']
         # define some flags
         self.frame_num = 0
         self.detect_objs = []
@@ -483,9 +476,27 @@ class Detect:
         self.width = int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("The width:{} height:{}".format(self.width, self.height))
-        # 若偵測範圍的結束點為0,根據偵測方向為水平或垂直設定結束座標為影像的寬或長
-        if self.detect_pos_end == 0:
-            self.detect_pos_end = self.width if self.flow_direction == "horizontal" else self.height
+        for config in self.detect_configs:
+            # 根據偵測方向為水平或垂直檢查結束座標數值是否正確
+            if config['direction'] == "horizontal":
+                if config['pos_end'] == 0 or config['pos_end'] > self.width:
+                    config['pos_end'] = self.width
+                    print("the detect pos_end has been updated to:{}".format(config['pos_end']))
+            else:
+                if config['pos_end'] == 0 or config['pos_end'] > self.height:
+                    config['pos_end'] = self.height
+                    print("the detect pos_end has been updated to:{}".format(config['pos_end']))
+            # the detection area line
+            line_pos_1 = config['pos'] - config['distance']
+            line_pos_2 = config['pos'] + config['distance']
+            # check detection area not over the screen
+            if config['direction'] == "horizontal" and (line_pos_1 > self.height or line_pos_2 > self.height):
+                config['pos'] = self.height - config['distance']
+                print("the detection area:{}~{} over the screen:{}, update pos to:{}".format(line_pos_1, line_pos_2, self.height, config['pos']))
+            elif config['direction'] == "vertical" and (line_pos_1 > self.width or line_pos_2 > self.width):
+                config['pos'] = self.width - config['distance']
+                print("the detection area:{}~{} over the screen:{}, update pos to:{}".format(line_pos_1, line_pos_2, self.width, config['pos']))
+
         assert not self.thread_running
         self.thread_running = True
         self.thread = threading.Thread(target=sub_process, args=(self, ))

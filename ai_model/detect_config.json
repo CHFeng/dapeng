@@ -1,66 +1,98 @@
 {
     "DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0":{
-        "flow_direction":"vertical",
-        "detect_pos": 1500,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"vertical",
+            "pos": 2300,
+            "pos_start": 700,
+            "pos_end": 1200,
+            "distance": 80,
+            "speed": 35
+        },{
+            "direction":"vertical",
+            "pos": 1400,
+            "pos_start": 630,
+            "pos_end": 1060,
+            "distance": 80,
+            "speed": 35,
+            "notify": true
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 1280,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 1280,
+            "pos_start": 0,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 1600,
-        "detect_pos_start": 1480,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 1600,
+            "pos_start": 1480,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 1280,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 1280,
+            "pos_start": 0,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 1280,
-        "detect_pos_start": 1480,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 1280,
+            "pos_start": 1480,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 800,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 800,
+            "pos_start": 0,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0":{
-        "flow_direction":"vertical",
-        "detect_pos": 1500,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"vertical",
+            "pos": 1500,
+            "pos_start": 0,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     },
     "DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0":{
-        "flow_direction":"horizontal",
-        "detect_pos": 1600,
-        "detect_pos_start": 0,
-        "detect_pos_end": 0,
-        "detect_distance": 80,
-        "object_speed": 35
+        "allow_classes": "person,car,truck,bus,motorbike",
+        "detect_configs":[{
+            "direction":"horizontal",
+            "pos": 1600,
+            "pos_start": 0,
+            "pos_end": 0,
+            "distance": 80,
+            "speed": 35
+        }]
     }
 }
