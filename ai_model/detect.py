@@ -22,6 +22,25 @@ from cnn_model.cnn_classify import detect_car_classified
 DETECTION_FRAME_RATE = 4
 
 
+def notify_web():
+    '''
+    通知思納捷主機有物件進入或離開偵測區域的事件
+    '''
+    pass
+    # send post request
+    try:
+        url = "思納捷主機API URL"
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+        # 根據API文件設定body內容
+        body = {}
+        body = json.dumps({'records': body})
+        result = requests.post(url, data=body, headers=headers)
+        if result.status_code != requests.codes.ok:
+            print("send notify Err:" + json.loads(result.text))
+    except Exception as err:
+        print("send notify Err:" + str(err))
+
+
 def write_into_db(counter, camId, allowed_classes):
     '''
     將統計資料透過POST寫入DB
@@ -252,6 +271,9 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                             left, top, right, bottom = bbox
                             cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
+                        # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
+                        if config['notify']:
+                            notify_web()
         # to append object into array if object doesn't existd
         if not existed:
             obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
