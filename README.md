@@ -27,6 +27,8 @@ uvicorn app:app --reload
 $ docker pull postgres
 # 指定port number & password來啟動postgres
 $ docker run -d --name my-postgres -p 8080:5432 -e POSTGRES_PASSWORD=admin postgres
+# 或者使用docker-compose透過設定檔啟動
+$ docker-compose up -d
 ```
 進入 PostgreSQL 的 CLI 命令列介面
 這裡會使用 exec 的 -i 與 -t 參數，讓終端機保持開啟。當進入 PostgreSQL 後若想離開，則可輸入 「\q」即可。
