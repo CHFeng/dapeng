@@ -25,7 +25,7 @@ from tensorflow.python.saved_model import tag_constants
 # local import
 import core.utils as utils
 
-YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "checkpoints/yolov4-416")
+YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "model_data/yolov4-416")
 flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")

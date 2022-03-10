@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import tensorflow as tf
 import numpy as np
@@ -17,7 +19,7 @@ config.gpu_options.allow_growth = True
 sess = tf.compat.v1.Session(config=config)
 
 # load model
-model = load_model(os.path.join(os.getcwd(), 'ai_model', 'cnn_model/{}_retrained_v2.h5').format(MODE_NAME))
+model = load_model(os.path.join(os.getcwd(), 'ai_model', 'model_data/{}_retrained_v2.h5').format(MODE_NAME))
 classes = ['ambulance', 'car', 'fire_engine', 'motorbike', 'pickup_truck', 'police_car', 'truck']
 
 

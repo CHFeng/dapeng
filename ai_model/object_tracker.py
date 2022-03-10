@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import tensorflow as tf
 # comment out below line to enable tensorflow logging outputs
@@ -28,7 +30,7 @@ from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 from deep_sort import preprocessing, nn_matching
 
-YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "checkpoints/yolov4-416")
+YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "model_data/yolov4-416")
 flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_integer("size", 416, "resize images to")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
