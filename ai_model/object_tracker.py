@@ -40,8 +40,8 @@ flags.DEFINE_boolean("info", True, "show detailed info of tracked objects")
 # the setting of object flow direction
 flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
 flags.DEFINE_integer("detect_pos", "1600", "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_x", "1480", "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_y", "0", "the position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_start", "0", "the start position coordinate for detecting")
+flags.DEFINE_integer("detect_pos_end", "0", "the end position coordinate for detecting")
 flags.DEFINE_integer("detect_distance", "80", "the distance for detecting")
 flags.DEFINE_integer("object_speed", "35", "the speed of object")
 flags.DEFINE_boolean("frame_debug", False, "show frame one by one for debug")
@@ -195,6 +195,9 @@ def main(_argv):
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print("The width:{} height:{}".format(width, height))
+    # 若偵測範圍的結束點為0,根據偵測方向為水平或垂直設定結束座標為影像的寬或長
+    if FLAGS.detect_pos_end == 0:
+        FLAGS.detect_pos_end = width if FLAGS.flow_direction == "horizontal" else height
 
     # read in all class names from config
     class_names = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -278,16 +281,16 @@ def main(_argv):
                 print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, height))
                 break
             if FLAGS.info:
-                cv2.line(frame, (FLAGS.detect_pos_x, line_pos_1), (width, line_pos_1), (255, 0, 0), 2)
-                cv2.line(frame, (FLAGS.detect_pos_x, line_pos_2), (width, line_pos_2), (255, 0, 0), 2)
+                cv2.line(frame, (FLAGS.detect_pos_start, line_pos_1), (FLAGS.detect_pos_end, line_pos_1), (255, 0, 0), 2)
+                cv2.line(frame, (FLAGS.detect_pos_start, line_pos_2), (FLAGS.detect_pos_end, line_pos_2), (255, 0, 0), 2)
         else:
             # check detection area not over the screen
             if line_pos_1 > width or line_pos_2 > width:
                 print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, width))
                 break
             if FLAGS.info:
-                cv2.line(frame, (line_pos_1, FLAGS.detect_pos_y), (line_pos_1, height), (255, 0, 0), 2)
-                cv2.line(frame, (line_pos_2, FLAGS.detect_pos_y), (line_pos_2, height), (255, 0, 0), 2)
+                cv2.line(frame, (line_pos_1, FLAGS.detect_pos_start), (line_pos_1, FLAGS.detect_pos_end), (255, 0, 0), 2)
+                cv2.line(frame, (line_pos_2, FLAGS.detect_pos_start), (line_pos_2, FLAGS.detect_pos_end), (255, 0, 0), 2)
         # loop through objects and use class index to get class name, allow only classes in allowed_classes list
         names = []
         deleted_indx = []
@@ -366,57 +369,57 @@ def main(_argv):
             if FLAGS.info:
                 cv2.circle(frame, (x_cen, y_cen), 5, (255, 0, 0), -1)
             # check be tracked object on detection area
+            checkDirection = False
             tracked_pos = 0
             if FLAGS.flow_direction == "horizontal":
-                tracked_pos = y_cen
+                # 當有偵測方向為horizontal(水平)判斷物件位置y在FLAGS.detect_pos與FLAGS.detect_distance範圍之間,x在detect_pos_start與detect_pos_end之間
+                if FLAGS.detect_pos_start < x_cen < FLAGS.detect_pos_end and (FLAGS.detect_pos - FLAGS.detect_distance) < y_cen < (
+                        FLAGS.detect_pos + FLAGS.detect_distance):
+                    checkDirection = True
+                    tracked_pos = y_cen
             else:
-                tracked_pos = x_cen
-            if tracked_pos > (FLAGS.detect_pos - FLAGS.detect_distance) and tracked_pos < (FLAGS.detect_pos + FLAGS.detect_distance):
-                if FLAGS.info:
-                    print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {}".format(str(track.track_id), class_name,
-                                                                                                      (x_cen, y_cen)))
-                checkDirection = True
-                # 當有設定FLAGS.detect_pos_y or FLAGS.detect_pos_x 需要物件位置大於設定值才計數
-                if FLAGS.detect_pos_y > 0 and y_cen < FLAGS.detect_pos_y:
-                    checkDirection = False
-                elif FLAGS.detect_pos_x > 0 and x_cen < FLAGS.detect_pos_y:
-                    checkDirection = False
-
-                if checkDirection:
-                    existed = False
-                    for obj in detect_objs:
-                        if obj['id'] == track.track_id:
-                            existed = True
-                            obj['frameCount'] += 1
-                            if FLAGS.flow_direction == "horizontal":
-                                orig_pos = obj['y_orig']
-                            else:
-                                orig_pos = obj['x_orig']
-                            diff = tracked_pos - orig_pos
-                            # check object direction if it is none
-                            if obj['direction'] == "none":
-                                if diff >= FLAGS.object_speed:
-                                    obj['direction'] = "down"
-                                    orig_pos = tracked_pos
-                                elif diff <= -FLAGS.object_speed:
-                                    obj['direction'] = "up"
-                                    orig_pos = tracked_pos
-                                # the direction has been detected, calculate speed
-                                if obj['direction'] != "none":
-                                    obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
-                                    cut_detect_object(frame, bbox, class_name, track.track_id)
-                    # to append object into array if object doesn't existd
-                    if not existed:
-                        obj = {
-                            "class": class_name,
-                            "id": track.track_id,
-                            "y_orig": y_cen,
-                            "x_orig": x_cen,
-                            "direction": "none",
-                            'frameCount': 0,
-                            'speed': 0
-                        }
-                        detect_objs.append(obj)
+                # 當有偵測方向為vertical(垂直)判斷物件位置x在FLAGS.detect_pos與FLAGS.detect_distance範圍之間,y在detect_pos_start與detect_pos_end之間
+                if FLAGS.detect_pos_start < y_cen < FLAGS.detect_pos_end and (FLAGS.detect_pos - FLAGS.detect_distance) < x_cen < (
+                        FLAGS.detect_pos + FLAGS.detect_distance):
+                    checkDirection = True
+                    tracked_pos = x_cen
+            if checkDirection:
+                print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {} W:{} H:{}".format(
+                    str(track.track_id), class_name, (x_cen, y_cen), int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])))
+                existed = False
+                for obj in detect_objs:
+                    if obj['id'] == track.track_id:
+                        existed = True
+                        obj['frameCount'] += 1
+                        if FLAGS.flow_direction == "horizontal":
+                            orig_pos = obj['y_orig']
+                        else:
+                            orig_pos = obj['x_orig']
+                        diff = tracked_pos - orig_pos
+                        # check object direction if it is none
+                        if obj['direction'] == "none":
+                            if diff >= FLAGS.object_speed:
+                                obj['direction'] = "down"
+                                orig_pos = tracked_pos
+                            elif diff <= -FLAGS.object_speed:
+                                obj['direction'] = "up"
+                                orig_pos = tracked_pos
+                            # the direction has been detected, calculate speed
+                            if obj['direction'] != "none":
+                                obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
+                                cut_detect_object(frame, bbox, class_name, track.track_id)
+                # to append object into array if object doesn't existd
+                if not existed:
+                    obj = {
+                        "class": class_name,
+                        "id": track.track_id,
+                        "y_orig": y_cen,
+                        "x_orig": x_cen,
+                        "direction": "none",
+                        'frameCount': 0,
+                        'speed': 0
+                    }
+                    detect_objs.append(obj)
             # if enable info flag then print details about each track
             # if FLAGS.info:
             #     print(

@@ -195,8 +195,8 @@ def check_track_direction(cam, bbox, class_name, track_id):
             #     line_pos_1, line_pos_2, cam.height))
             line_pos_1 = cam.height - cam.detect_distance // 2
             line_pos_2 = cam.height + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_1), (cam.width, line_pos_1), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (cam.detect_pos_x, line_pos_2), (cam.width, line_pos_2), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (cam.detect_pos_start, line_pos_1), (cam.detect_pos_end, line_pos_1), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (cam.detect_pos_start, line_pos_2), (cam.detect_pos_end, line_pos_2), (255, 0, 0), 2)
     else:
         # check detection area not over the screen
         if line_pos_1 > cam.width or line_pos_2 > cam.width:
@@ -204,8 +204,8 @@ def check_track_direction(cam, bbox, class_name, track_id):
             #     line_pos_1, line_pos_2, cam.width))
             line_pos_1 = cam.width - cam.detect_distance // 2
             line_pos_2 = cam.width + cam.detect_distance // 2
-        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_y), (line_pos_1, cam.height), (255, 0, 0), 2)
-        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_y), (line_pos_2, cam.height), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (line_pos_1, cam.detect_pos_start), (line_pos_1, cam.detect_pos_end), (255, 0, 0), 2)
+        cv2.line(cam.img_handle, (line_pos_2, cam.detect_pos_start), (line_pos_2, cam.detect_pos_end), (255, 0, 0), 2)
 
     # calcuate position of bbox and draw circle on
     x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
@@ -214,50 +214,54 @@ def check_track_direction(cam, bbox, class_name, track_id):
     # cv2.circle(cam.img_handle, (x_cen, y_cen), 5, (255, 0, 0), -1)
 
     # check be tracked object on detection area
+    checkDirection = False
     tracked_pos = 0
     if cam.flow_direction == "horizontal":
-        tracked_pos = y_cen
+        # 當有偵測方向為horizontal(水平)判斷物件位置y在cam.detect_pos與cam.detect_distance範圍之間
+        # x在detect_pos_start與detect_pos_end之間
+        if cam.detect_pos_start < x_cen < cam.detect_pos_end and \
+         (cam.detect_pos - cam.detect_distance) < y_cen < (cam.detect_pos + cam.detect_distance):
+            checkDirection = True
+            tracked_pos = y_cen
     else:
-        tracked_pos = x_cen
-    if tracked_pos > (cam.detect_pos - cam.detect_distance) and tracked_pos < (cam.detect_pos + cam.detect_distance):
-        checkDirection = True
-        # 當有設定cam.detect_pos_y or cam.detect_pos_x 需要物件位置大於設定值才計數
-        if cam.detect_pos_y > 0 and y_cen < cam.detect_pos_y:
-            checkDirection = False
-        elif cam.detect_pos_x > 0 and x_cen < cam.detect_pos_y:
-            checkDirection = False
+        # 當有偵測方向為vertical(垂直)判斷物件位置x在cam.detect_pos與cam.detect_distance範圍之間
+        # y在detect_pos_start與detect_pos_end之間
+        if cam.detect_pos_start < y_cen < cam.detect_pos_end and \
+            (cam.detect_pos - cam.detect_distance) < x_cen < (cam.detect_pos + cam.detect_distance):
+            checkDirection = True
+            tracked_pos = x_cen
 
-        if checkDirection:
-            existed = False
-            for obj in cam.detect_objs:
-                if obj['id'] == track_id:
-                    existed = True
-                    obj['frameCount'] += 1
-                    if cam.flow_direction == "horizontal":
-                        orig_pos = obj['y_orig']
-                    else:
-                        orig_pos = obj['x_orig']
-                    diff = tracked_pos - orig_pos
-                    # check object direction if it is none
-                    if obj['direction'] == "none":
-                        if diff >= cam.object_speed:
-                            obj['direction'] = "down"
-                            orig_pos = tracked_pos
-                        elif diff <= -cam.object_speed:
-                            obj['direction'] = "up"
-                            orig_pos = tracked_pos
-                        # the direction has been detected, calculate speed
-                        if obj['direction'] != "none":
-                            obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
-                            # 只有原本判斷為car or truck會需要進一步分類
-                            if class_name == "car" or class_name == "truck":
-                                left, top, right, bottom = bbox
-                                cut_img = cv2.cvtColor(cam.img_handle[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
-                                class_name = detect_car_classified(cut_img, class_name)
-            # to append object into array if object doesn't existd
-            if not existed:
-                obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
-                cam.detect_objs.append(obj)
+    if checkDirection:
+        existed = False
+        for obj in cam.detect_objs:
+            if obj['id'] == track_id:
+                existed = True
+                obj['frameCount'] += 1
+                if cam.flow_direction == "horizontal":
+                    orig_pos = obj['y_orig']
+                else:
+                    orig_pos = obj['x_orig']
+                diff = tracked_pos - orig_pos
+                # check object direction if it is none
+                if obj['direction'] == "none":
+                    if diff >= cam.object_speed:
+                        obj['direction'] = "down"
+                        orig_pos = tracked_pos
+                    elif diff <= -cam.object_speed:
+                        obj['direction'] = "up"
+                        orig_pos = tracked_pos
+                    # the direction has been detected, calculate speed
+                    if obj['direction'] != "none":
+                        obj['speed'] = calculate_object_move_speed(obj['x_orig'], obj['y_orig'], x_cen, y_cen, obj['frameCount'])
+                        # 只有原本判斷為car or truck會需要進一步分類
+                        if class_name == "car" or class_name == "truck":
+                            left, top, right, bottom = bbox
+                            cut_img = cv2.cvtColor(cam.img_handle[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
+                            class_name = detect_car_classified(cut_img, class_name)
+        # to append object into array if object doesn't existd
+        if not existed:
+            obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
+            cam.detect_objs.append(obj)
 
 
 def deep_sort(cam, detections):
@@ -433,8 +437,8 @@ class Detect:
         # initialize detect config
         self.flow_direction = args['flow_direction']
         self.detect_pos = args['detect_pos']
-        self.detect_pos_x = args['detect_pos_x']
-        self.detect_pos_y = args['detect_pos_y']
+        self.detect_pos_start = args['detect_pos_start']
+        self.detect_pos_end = args['detect_pos_end']
         self.detect_distance = args['detect_distance']
         self.object_speed = args['object_speed']
         # define some flags
@@ -479,8 +483,9 @@ class Detect:
         self.width = int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("The width:{} height:{}".format(self.width, self.height))
-        # start the child thread if not using a video file source
-        # i.e. rtsp, usb or onboard
+        # 若偵測範圍的結束點為0,根據偵測方向為水平或垂直設定結束座標為影像的寬或長
+        if self.detect_pos_end == 0:
+            self.detect_pos_end = self.width if self.flow_direction == "horizontal" else self.height
         assert not self.thread_running
         self.thread_running = True
         self.thread = threading.Thread(target=sub_process, args=(self, ))
