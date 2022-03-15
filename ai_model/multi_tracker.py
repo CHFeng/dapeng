@@ -74,13 +74,13 @@ def main(_argv):
         print("Can't not get NVR config, use default value")
         camIds = [
             'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
-            'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
+            # 'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
         ]
     # read video source detect config from json file
     with open(os.path.join(os.getcwd(), "ai_model", "detect_config.json"), 'r') as f:

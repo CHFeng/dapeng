@@ -3,19 +3,17 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"vertical",
-            "pos": 2300,
-            "pos_start": 700,
-            "pos_end": 1200,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [2220, 700],
+            "leftDown": [2120, 1200],
+            "rightUp": [2480, 600],
+            "rightDown":[2180, 1200],
             "notify": false
         },{
-            "direction":"vertical",
-            "pos": 1400,
-            "pos_start": 630,
-            "pos_end": 1060,
-            "distance": 80,
-            "speed": 35,
+            "direction":"horizontal",
+            "leftUp": [320, 630],
+            "leftDown": [320, 1060],
+            "rightUp": [1480, 630],
+            "rightDown":[1480, 1060],
             "notify": true
         }]
     },

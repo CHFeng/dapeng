@@ -22,21 +22,22 @@ from deep_sort import preprocessing, nn_matching
 from cnn_model.cnn_classify import detect_car_classified
 
 DETECTION_FRAME_RATE = 4
+WEB_NOTIFY_URL = "http://{server_domain}/api/nvr/notify"
 
 
 def notify_web():
     '''
     通知思納捷主機有物件進入或離開偵測區域的事件
     '''
-    pass
+    print("TEST Notify")
+    return
     # send post request
     try:
-        url = "思納捷主機API URL"
         headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
         # 根據API文件設定body內容
         body = {}
         body = json.dumps({'records': body})
-        result = requests.post(url, data=body, headers=headers)
+        result = requests.post(WEB_NOTIFY_URL, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             print("send notify Err:" + json.loads(result.text))
     except Exception as err:
@@ -123,6 +124,18 @@ def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
     # print("object Speed:{}".format(speed))
     # if speed over 120, it should be wrong
     return speed if speed < 120 else 0
+
+
+def getCross(p1, p2, p):
+    return (p2[0] - p1[0]) * (p[1] - p1[1]) - (p[0] - p1[0]) * (p2[1] - p1[1])
+
+
+def isPointInMatrix(p1, p2, p3, p4, p):
+    '''
+    使用向量叉積公式判斷點P是否在凸四邊形內
+    P1~P4為四邊形的座標且需要"順時針"帶入
+    '''
+    return getCross(p1, p2, p) * getCross(p3, p4, p) >= 0 and getCross(p2, p3, p) * getCross(p4, p1, p) >= 0
 
 
 def yolov4(cam):
@@ -212,38 +225,21 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
     如果偵測區間設定為垂直(vertical),則物件往右移動(Y變大),則位移方向判定為down
     '''
     # the detection area line
-    line_pos_1 = config['pos'] - config['distance']
-    line_pos_2 = config['pos'] + config['distance']
-    # draw the detection area line on the screen
-    if config['direction'] == "horizontal":
-        cv2.line(frame, (config['pos_start'], line_pos_1), (config['pos_end'], line_pos_1), (255, 0, 0), 2)
-        cv2.line(frame, (config['pos_start'], line_pos_2), (config['pos_end'], line_pos_2), (255, 0, 0), 2)
-    else:
-        cv2.line(frame, (line_pos_1, config['pos_start']), (line_pos_1, config['pos_end']), (255, 0, 0), 2)
-        cv2.line(frame, (line_pos_2, config['pos_start']), (line_pos_2, config['pos_end']), (255, 0, 0), 2)
-
+    points = np.array([config['leftUp'], config['leftDown'], config['rightDown'], config['rightUp']], np.int32)
+    cv2.polylines(frame, pts=[points], isClosed=True, color=(255, 0, 0), thickness=3)
     # calcuate position of bbox and draw circle on
     x_cen = int(bbox[0] + (bbox[2] - bbox[0]) / 2)
     y_cen = int(bbox[1] + (bbox[3] - bbox[1]) / 2)
-    # just for debug show the center position of object on screen
+    # show the center position of object on screen
     cv2.circle(frame, (x_cen, y_cen), 5, (255, 0, 0), -1)
-
     # check be tracked object on detection area
     checkDirection = False
     tracked_pos = 0
-    if config['direction'] == "horizontal":
-        # 當有偵測方向為horizontal(水平)判斷物件位置y在cam.detect_pos與cam.detect_distance範圍之間
-        # x在detect_pos_start與detect_pos_end之間
-        if config['pos_start'] < x_cen < config['pos_end'] and \
-         (config['pos'] - config['distance']) < y_cen < (config['pos'] + config['distance']):
-            checkDirection = True
+    if isPointInMatrix(config['leftUp'], config['rightUp'], config['rightDown'], config['leftDown'], [x_cen, y_cen]):
+        checkDirection = True
+        if config['direction'] == "horizontal":
             tracked_pos = y_cen
-    else:
-        # 當有偵測方向為vertical(垂直)判斷物件位置x在cam.detect_pos與cam.detect_distance範圍之間
-        # y在detect_pos_start與detect_pos_end之間
-        if config['pos_start'] < y_cen < config['pos_end'] and \
-            (config['pos'] - config['distance']) < x_cen < (config['pos'] + config['distance']):
-            checkDirection = True
+        else:
             tracked_pos = x_cen
 
     if checkDirection:
@@ -259,10 +255,10 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                 diff = tracked_pos - orig_pos
                 # check object direction if it is none
                 if obj['direction'] == "none":
-                    if diff >= config['speed']:
+                    if diff >= config['threshold']:
                         obj['direction'] = "down"
                         orig_pos = tracked_pos
-                    elif diff <= -config['speed']:
+                    elif diff <= -config['threshold']:
                         obj['direction'] = "up"
                         orig_pos = tracked_pos
                     # the direction has been detected, calculate speed
@@ -274,8 +270,9 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                             cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
                         # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
-                        if 'notify' in config and config['notify']:
+                        if 'notify' in config and config['notify'] == True:
                             notify_web()
+                        print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
         # to append object into array if object doesn't existd
         if not existed:
             obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
@@ -501,25 +498,25 @@ class Detect:
         self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("The width:{} height:{}".format(self.width, self.height))
         for config in self.detect_configs:
-            # 根據偵測方向為水平或垂直檢查結束座標數值是否正確
+            # 計算物件位移方向的threshold
             if config['direction'] == "horizontal":
-                if config['pos_end'] == 0 or config['pos_end'] > self.width:
-                    config['pos_end'] = self.width
-                    print("the detect pos_end has been updated to:{}".format(config['pos_end']))
-            else:
-                if config['pos_end'] == 0 or config['pos_end'] > self.height:
-                    config['pos_end'] = self.height
-                    print("the detect pos_end has been updated to:{}".format(config['pos_end']))
-            # the detection area line
-            line_pos_1 = config['pos'] - config['distance']
-            line_pos_2 = config['pos'] + config['distance']
-            # check detection area not over the screen
-            if config['direction'] == "horizontal" and (line_pos_1 > self.height or line_pos_2 > self.height):
-                config['pos'] = self.height - config['distance']
-                print("the detection area:{}~{} over the screen:{}, update pos to:{}".format(line_pos_1, line_pos_2, self.height, config['pos']))
-            elif config['direction'] == "vertical" and (line_pos_1 > self.width or line_pos_2 > self.width):
-                config['pos'] = self.width - config['distance']
-                print("the detection area:{}~{} over the screen:{}, update pos to:{}".format(line_pos_1, line_pos_2, self.width, config['pos']))
+                # 水平方向的判定,計算上下兩邊的Y間隔距離,使用較小的數值/2為threshold
+                y_diff_1 = abs(config['leftUp'][1] - config['leftDown'][1])
+                y_diff_2 = abs(config['rightUp'][1] - config['rightDown'][1])
+                if y_diff_1 < y_diff_2:
+                    config['threshold'] = y_diff_1 // 2
+                else:
+                    config['threshold'] = y_diff_2 // 2
+                print(y_diff_1, y_diff_2, config['threshold'])
+            elif config['direction'] == "vertical":
+                # 垂直方向的判定,計算左右兩邊的X間隔距離,使用較小的數值/2為threshold
+                x_diff_1 = abs(config['leftUp'][0] - config['rightUp'][0])
+                x_diff_2 = abs(config['leftDown'][0] - config['rightDown'][0])
+                if x_diff_1 < x_diff_2:
+                    config['threshold'] = x_diff_1 // 2
+                else:
+                    config['threshold'] = x_diff_2 // 2
+                print(x_diff_1, x_diff_2, config['threshold'])
 
         assert not self.thread_running
         self.thread_running = True

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from db_postgres import Database, Record
 
 APP_VERSION = "3.0.1"
-POST_ERR_URL = "http://{server_domain}/api/nvr/error"
+WEB_ERROR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
 # create postgres instance
@@ -69,9 +69,7 @@ def send_err_to_web(errorCode: str, errorMsg: str):
         else:
             errorCode = 'A02'
         body = {'errorCode': errorCode, 'errorMsg': errorMsg, 'time': dt.now().strftime("%Y-%m-%d %H:%M:%S"), 'source': 'iii'}
-        print(body)
-        return
-        result = requests.post(POST_ERR_URL, data=body)
+        result = requests.post(WEB_ERROR_URL, data=body)
         if result.status_code != requests.codes.ok:
             print("send error to web Err:" + json.loads(result.text))
         else:

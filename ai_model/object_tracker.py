@@ -40,12 +40,11 @@ flags.DEFINE_float("score", 0.50, "score threshold")
 flags.DEFINE_boolean("dont_show", False, "dont show video output")
 flags.DEFINE_boolean("info", True, "show detailed info of tracked objects")
 # the setting of object flow direction
-flags.DEFINE_string("flow_direction", "horizontal", "horizontal or vertical")
-flags.DEFINE_integer("detect_pos", "1600", "the position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_start", "0", "the start position coordinate for detecting")
-flags.DEFINE_integer("detect_pos_end", "0", "the end position coordinate for detecting")
-flags.DEFINE_integer("detect_distance", "80", "the distance for detecting")
-flags.DEFINE_integer("object_speed", "35", "the speed of object")
+flags.DEFINE_string("direction", "vertical", "horizontal or vertical")
+flags.DEFINE_list("leftUp", [2220, 700], "the detection point on left-up")
+flags.DEFINE_list("leftDown", [2120, 1200], "the detection point on left-down")
+flags.DEFINE_list("rightUp", [2480, 600], "the detection point on right-up")
+flags.DEFINE_list("rightDown", [2180, 1200], "the detection point on right-down")
 flags.DEFINE_boolean("frame_debug", False, "show frame one by one for debug")
 flags.DEFINE_string("allow_classes", "person,car,truck,bus,motorbike", "allowed classes")
 # NVR video source index
@@ -55,6 +54,18 @@ flags.DEFINE_boolean("cut_img", False, "cut object image when detected")
 FONT_SCALE = 2
 # the time interval(seconds) to write counter value into DB
 WRITE_DB_INTERVAL = 5 * 60
+
+
+def getCross(p1, p2, p):
+    return (p2[0] - p1[0]) * (p[1] - p1[1]) - (p[0] - p1[0]) * (p2[1] - p1[1])
+
+
+def isPointInMatrix(p1, p2, p3, p4, p):
+    '''
+    使用向量叉積公式判斷點P是否在凸四邊形內
+    P1~P4為四邊形的座標且需要"順時針"帶入
+    '''
+    return getCross(p1, p2, p) * getCross(p3, p4, p) >= 0 and getCross(p2, p3, p) * getCross(p4, p1, p) >= 0
 
 
 def write_into_db(counter, camId, allowed_classes):
@@ -138,7 +149,7 @@ def cut_detect_object(frame, bbox, object_type, index):
         now = dt.now().strftime("%Y-%m-%d %H:%M:%S")
         left, top, right, bottom = bbox
         cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
-        filePath = os.path(os.getcwd(), "ai_model", "detection_images/{}/{}-{}.png".format(object_type, now, index))
+        filePath = os.path.join(os.getcwd(), "ai_model", "detection_images/{}/{}-{}.png".format(object_type, now, index))
         # print("top:{} left:{} right:{} bottom:{} filePath:{}".format(top, left, right, bottom, filePath))
         cv2.imwrite(filePath, cut_img)
     except Exception as err:
@@ -163,7 +174,7 @@ def main(_argv):
     except:
         # exit("Can't not get NVR config")
         # just for test
-        camId = "DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0"
+        camId = "DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0"
         rtspUrl = "rtsp://user1:user10824@60.249.33.163:554/hosts/" + camId
         print("Can't not get NVR config, use default rtsp url:{}".format(rtspUrl))
     # Definition of the parameters
@@ -197,15 +208,26 @@ def main(_argv):
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print("The width:{} height:{}".format(width, height))
-    # 根據偵測方向為水平或垂直檢查結束座標數值是否正確
-    if FLAGS.flow_direction == "horizontal":
-        if FLAGS.detect_pos_end == 0 or FLAGS.detect_pos_end > width:
-            FLAGS.detect_pos_end = width
-            print("the detect pos_end has been updated to:{}".format(FLAGS.detect_pos_end))
+    # 計算物件位移方向的threshold
+    threshold = 0
+    if FLAGS.direction == "horizontal":
+        # 水平方向的判定,計算上下兩邊的Y間隔距離,使用較小的數值/2為threshold
+        y_diff_1 = abs(FLAGS.leftUp[1] - FLAGS.leftDown[1])
+        y_diff_2 = abs(FLAGS.rightUp[1] - FLAGS.rightDown[1])
+        if y_diff_1 < y_diff_2:
+            threshold = y_diff_1 // 2
+        else:
+            threshold = y_diff_2 // 2
+        print(y_diff_1, y_diff_2, threshold)
     else:
-        if FLAGS.detect_pos_end == 0 or FLAGS.detect_pos_end > height:
-            FLAGS.detect_pos_end = height
-            print("the detect pos_end has been updated to:{}".format(FLAGS.detect_pos_end))
+        # 垂直方向的判定,計算左右兩邊的X間隔距離,使用較小的數值/2為threshold
+        x_diff_1 = abs(FLAGS.leftUp[0] - FLAGS.rightUp[0])
+        x_diff_2 = abs(FLAGS.leftDown[0] - FLAGS.rightDown[0])
+        if x_diff_1 < x_diff_2:
+            threshold = x_diff_1 // 2
+        else:
+            threshold = x_diff_2 // 2
+        print(x_diff_1, x_diff_2, threshold)
 
     # read in all class names from config
     class_names = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -215,10 +237,6 @@ def main(_argv):
     else:
         # by default allow all classes in .names file
         allowed_classes = list(class_names.values())
-
-    # the detection area line
-    line_pos_1 = FLAGS.detect_pos - FLAGS.detect_distance
-    line_pos_2 = FLAGS.detect_pos + FLAGS.detect_distance
 
     frame_num = 0
     detect_objs = []
@@ -282,23 +300,9 @@ def main(_argv):
         # store all predictions in one parameter for simplicity when calling functions
         pred_bbox = [bboxes, scores, classes, num_objects]
 
-        # draw the detection area line on the screen
-        if FLAGS.flow_direction == "horizontal":
-            # check detection area not over the screen
-            if line_pos_1 > height or line_pos_2 > height:
-                print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, height))
-                break
-            if FLAGS.info:
-                cv2.line(frame, (FLAGS.detect_pos_start, line_pos_1), (FLAGS.detect_pos_end, line_pos_1), (255, 0, 0), 2)
-                cv2.line(frame, (FLAGS.detect_pos_start, line_pos_2), (FLAGS.detect_pos_end, line_pos_2), (255, 0, 0), 2)
-        else:
-            # check detection area not over the screen
-            if line_pos_1 > width or line_pos_2 > width:
-                print("the detection area:{}~{} over the screen:{}".format(line_pos_1, line_pos_2, width))
-                break
-            if FLAGS.info:
-                cv2.line(frame, (line_pos_1, FLAGS.detect_pos_start), (line_pos_1, FLAGS.detect_pos_end), (255, 0, 0), 2)
-                cv2.line(frame, (line_pos_2, FLAGS.detect_pos_start), (line_pos_2, FLAGS.detect_pos_end), (255, 0, 0), 2)
+        # the detection area line
+        points = np.array([FLAGS.leftUp, FLAGS.leftDown, FLAGS.rightDown, FLAGS.rightUp], np.int32)
+        cv2.polylines(frame, pts=[points], isClosed=True, color=(255, 0, 0), thickness=3)
         # loop through objects and use class index to get class name, allow only classes in allowed_classes list
         names = []
         deleted_indx = []
@@ -379,37 +383,31 @@ def main(_argv):
             # check be tracked object on detection area
             checkDirection = False
             tracked_pos = 0
-            if FLAGS.flow_direction == "horizontal":
-                # 當有偵測方向為horizontal(水平)判斷物件位置y在FLAGS.detect_pos與FLAGS.detect_distance範圍之間,x在detect_pos_start與detect_pos_end之間
-                if FLAGS.detect_pos_start < x_cen < FLAGS.detect_pos_end and (FLAGS.detect_pos - FLAGS.detect_distance) < y_cen < (
-                        FLAGS.detect_pos + FLAGS.detect_distance):
-                    checkDirection = True
+            if isPointInMatrix(FLAGS.leftUp, FLAGS.rightUp, FLAGS.rightDown, FLAGS.leftDown, [x_cen, y_cen]):
+                checkDirection = True
+                if FLAGS.direction == "horizontal":
                     tracked_pos = y_cen
-            else:
-                # 當有偵測方向為vertical(垂直)判斷物件位置x在FLAGS.detect_pos與FLAGS.detect_distance範圍之間,y在detect_pos_start與detect_pos_end之間
-                if FLAGS.detect_pos_start < y_cen < FLAGS.detect_pos_end and (FLAGS.detect_pos - FLAGS.detect_distance) < x_cen < (
-                        FLAGS.detect_pos + FLAGS.detect_distance):
-                    checkDirection = True
+                else:
                     tracked_pos = x_cen
             if checkDirection:
-                print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {} W:{} H:{}".format(
-                    str(track.track_id), class_name, (x_cen, y_cen), int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])))
+                # print("Tracker In Area ID: {}, Class: {},  BBox Coords (x_cen, y_cen): {} W:{} H:{}".format(
+                #     str(track.track_id), class_name, (x_cen, y_cen), int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])))
                 existed = False
                 for obj in detect_objs:
                     if obj['id'] == track.track_id:
                         existed = True
                         obj['frameCount'] += 1
-                        if FLAGS.flow_direction == "horizontal":
+                        if FLAGS.direction == "horizontal":
                             orig_pos = obj['y_orig']
                         else:
                             orig_pos = obj['x_orig']
                         diff = tracked_pos - orig_pos
                         # check object direction if it is none
                         if obj['direction'] == "none":
-                            if diff >= FLAGS.object_speed:
+                            if diff >= threshold:
                                 obj['direction'] = "down"
                                 orig_pos = tracked_pos
-                            elif diff <= -FLAGS.object_speed:
+                            elif diff <= -threshold:
                                 obj['direction'] = "up"
                                 orig_pos = tracked_pos
                             # the direction has been detected, calculate speed
@@ -461,7 +459,7 @@ def main(_argv):
             if counter[key] == 0:
                 continue
             labelName = key
-            if FLAGS.flow_direction == "vertical":
+            if FLAGS.direction == "vertical":
                 if "up" in key:
                     labelName = key.replace("up", "IN")
                 elif "down" in key:
