@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database, Record
 
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.0.1"
 POST_ERR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
@@ -20,6 +20,14 @@ db = Database()
 
 class Records(BaseModel):
     records: List[Record]
+
+
+class CameraRecords(BaseModel):
+    startTime: int
+    endTime: int
+    apiUrl: str
+    eventTypes: str
+    type: Optional[str] = 'ALL'
 
 
 # 自定義open API文件說明
@@ -259,7 +267,7 @@ def delect_record(id: UUID):
 
 
 @app.post("/camera/records")
-def get_records(startTime: int, endTime: int, apiUrl: str, EventTypes: str, type: Optional[str] = 'ALL'):
+def get_records(body: CameraRecords):
     '''
     查詢某時間段的所有攝影機記錄的資訊\n
     ● startTime(required): 開始時間 (long time to millisecond)\n
@@ -287,15 +295,16 @@ def get_records(startTime: int, endTime: int, apiUrl: str, EventTypes: str, type
     message: 執行結果; 成功=空字串, 失敗=錯誤訊息\n
     data: 回傳所有攝影機統計內容;NVR影像來源ID包含該時段的各類型總數\n
     '''
-
+    print(body)
     data = []
-    if startTime and endTime and startTime > endTime:
+    if body.startTime and body.endTime and body.startTime > body.endTime:
         return resp("startTime should be less than endTime")
     try:
         # conver milliseconds to date type
-        start_time = dt.fromtimestamp(startTime / 1000.0)
-        end_time = dt.fromtimestamp(endTime / 1000.0)
+        start_time = dt.fromtimestamp(body.startTime / 1000.0)
+        end_time = dt.fromtimestamp(body.endTime / 1000.0)
         # if type is ALL, remove type query
+        type = body.type
         if type == 'ALL': type = None
         rows = db.get_record(start_time=start_time, end_time=end_time, type=type)
 
