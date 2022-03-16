@@ -14,18 +14,17 @@
             "leftDown": [320, 1060],
             "rightUp": [1480, 630],
             "rightDown":[1480, 1060],
-            "notify": true
+            "notify": false
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0":{
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 1280,
-            "pos_start": 0,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [0, 1200],
+            "leftDown": [0, 1360],
+            "rightUp": [2560, 1200],
+            "rightDown":[2560, 1360],
             "notify": false
         }]
     },
@@ -33,11 +32,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 1600,
-            "pos_start": 1480,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [1480, 1520],
+            "leftDown": [1480, 1680],
+            "rightUp": [2560, 1520],
+            "rightDown":[2560, 1680],
             "notify": false
         }]
     },
@@ -45,11 +43,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 1280,
-            "pos_start": 0,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [0, 1200],
+            "leftDown": [0, 1360],
+            "rightUp": [2560, 1200],
+            "rightDown":[2560, 1360],
             "notify": false
         }]
     },
@@ -57,11 +54,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 1280,
-            "pos_start": 1480,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [1480, 1200],
+            "leftDown": [1480, 1360],
+            "rightUp": [2560, 1200],
+            "rightDown":[2560, 1360],
             "notify": false
         }]
     },
@@ -69,11 +65,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 800,
-            "pos_start": 0,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [0, 720],
+            "leftDown": [0, 880],
+            "rightUp": [2560, 720],
+            "rightDown":[2560, 880],
             "notify": false
         }]
     },
@@ -81,11 +76,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"vertical",
-            "pos": 1500,
-            "pos_start": 0,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [1420, 0],
+            "leftDown": [1420, 1920],
+            "rightUp": [1580, 0],
+            "rightDown":[1580, 1920],
             "notify": false
         }]
     },
@@ -93,11 +87,10 @@
         "allow_classes": "person,car,truck,bus,motorbike",
         "detect_configs":[{
             "direction":"horizontal",
-            "pos": 1600,
-            "pos_start": 0,
-            "pos_end": 0,
-            "distance": 80,
-            "speed": 35,
+            "leftUp": [0, 1520],
+            "leftDown": [0, 1680],
+            "rightUp": [2560, 1520],
+            "rightDown":[2560, 1680],
             "notify": false
         }]
     }

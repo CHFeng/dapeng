@@ -29,8 +29,6 @@ def notify_web():
     '''
     通知思納捷主機有物件進入或離開偵測區域的事件
     '''
-    print("TEST Notify")
-    return
     # send post request
     try:
         headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
@@ -272,7 +270,7 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                         # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
                         if 'notify' in config and config['notify'] == True:
                             notify_web()
-                        print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
+                        # print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
         # to append object into array if object doesn't existd
         if not existed:
             obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
@@ -443,6 +441,7 @@ class Detect:
         self.rtspUrl = rtspUrl
         # initialize vid
         self.vid = None
+        self.img_handle = None
         self.width = 0
         self.height = 0
         self.camId = camId
@@ -462,7 +461,8 @@ class Detect:
         self.thread_running = False
         self.is_detected = False
         self.is_opened = False
-        self._open()  # try to open the camera
+        # try to open the camera
+        self._open()
 
     def _open(self):
         """Open camera based on command line arguments."""
@@ -498,6 +498,16 @@ class Detect:
         self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print("The width:{} height:{}".format(self.width, self.height))
         for config in self.detect_configs:
+            # 判斷偵測範圍右邊的點是否超過實際影像的寬
+            if config['rightUp'][0] > self.width:
+                config['rightUp'][0] = self.width
+            if config['rightDown'][0] > self.width:
+                config['rightDown'][0] = self.width
+            # 判斷偵測範圍下邊的點是否超過實際影像的高
+            if config['leftDown'][1] > self.height:
+                config['leftDown'][1] = self.height
+            if config['rightDown'][1] > self.height:
+                config['rightDown'][1] = self.height
             # 計算物件位移方向的threshold
             if config['direction'] == "horizontal":
                 # 水平方向的判定,計算上下兩邊的Y間隔距離,使用較小的數值/2為threshold
@@ -507,7 +517,7 @@ class Detect:
                     config['threshold'] = y_diff_1 // 2
                 else:
                     config['threshold'] = y_diff_2 // 2
-                print(y_diff_1, y_diff_2, config['threshold'])
+                # print(y_diff_1, y_diff_2, config['threshold'])
             elif config['direction'] == "vertical":
                 # 垂直方向的判定,計算左右兩邊的X間隔距離,使用較小的數值/2為threshold
                 x_diff_1 = abs(config['leftUp'][0] - config['rightUp'][0])
@@ -516,7 +526,7 @@ class Detect:
                     config['threshold'] = x_diff_1 // 2
                 else:
                     config['threshold'] = x_diff_2 // 2
-                print(x_diff_1, x_diff_2, config['threshold'])
+                # print(x_diff_1, x_diff_2, config['threshold'])
 
         assert not self.thread_running
         self.thread_running = True

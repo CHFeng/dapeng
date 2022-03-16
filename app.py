@@ -271,7 +271,7 @@ def get_records(body: CameraRecords):
     ● startTime(required): 開始時間 (long time to millisecond)\n
     ● endTime(required): 結束時間 (long time to millisecond)\n
     ● apiUrl: NVR的URL路徑\n
-    ● EventTypes: 事件類型\n
+    ● eventTypes: 事件類型\n
         LOITERING: 電子圍籬
         STOPPED: 違停
         ENTER: 人車量資訊
