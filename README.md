@@ -89,3 +89,10 @@ npm -v
 sudo npm install pm2 -g
 ```
 我們使用ecosystem.config.js來設定要啟動的服務與相關參數
+# 使用pm2-logrotate管理log
+*[參考](https://www.gushiciku.cn/pl/phPM/zh-tw)
+安裝logrotate的模組
+```
+pm2 install pm2-logrotate
+```
+
