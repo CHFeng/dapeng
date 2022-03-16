@@ -143,7 +143,6 @@ class Database:
             query += "type='{}' ".format(type)
 
         query = "SELECT * FROM {} WHERE ".format(RECORD_TABLE_NAME) + query
-        print("Get record Query:", query)
         self.cursor.execute(query)
         rows = self.cursor.fetchall()
         for row in rows:
@@ -158,6 +157,7 @@ class Database:
                 'outAvgSpeed': row[7],
             }
             data.append(record)
+        print("Get record Query:{} Rows:{}".format(query, len(rows)))
 
         return data
 

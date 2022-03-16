@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database, Record
 
-APP_VERSION = "3.0.2"
+APP_VERSION = "3.0.3"
 WEB_ERROR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
@@ -293,11 +293,17 @@ def get_records(body: CameraRecords):
     message: 執行結果; 成功=空字串, 失敗=錯誤訊息\n
     data: 回傳所有攝影機統計內容;NVR影像來源ID包含該時段的各類型總數\n
     '''
-    print(body)
     data = []
     if body.startTime and body.endTime and body.startTime > body.endTime:
         return resp("startTime should be less than endTime")
     try:
+        nvrResp = check_nvr()
+        camShortName = {}
+        if nvrResp['nvrStatus'] == 200:
+            for camInfo in nvrResp['resp']:
+                camShortName[camInfo['origin']] = camInfo['friendlyNameShort']
+        if not camShortName:
+            raise RuntimeError("Can't fetch friendlyNameShort of camera")
         # conver milliseconds to date type
         start_time = dt.fromtimestamp(body.startTime / 1000.0)
         end_time = dt.fromtimestamp(body.endTime / 1000.0)
@@ -324,7 +330,10 @@ def get_records(body: CameraRecords):
 
         # 轉換資料格式符合需求文件
         for key in statistics.keys():
-            temp = {'camera': key, 'detail': []}
+            camera = key
+            if key in camShortName:
+                camera = camShortName[key]
+            temp = {'camera': camera, 'detail': []}
             for objType in statistics[key].keys():
                 temp['detail'].append({
                     'type': objType,
@@ -415,7 +424,7 @@ def get_statistics_traffic(camera: str, apiUrl: str, startTime: int, endTime: in
                     carCounter += row['inCounter']
                     if row['inAvgSpeed']:
                         carSpeed = (carSpeed + row['inAvgSpeed']) // 2 if carSpeed else row['inAvgSpeed']
-                    print("Start:{} End:{} Data:{} Speed:{}".format(start, end, row, carSpeed))
+                    # print("Start:{} End:{} Data:{} Speed:{}".format(start, end, row, carSpeed))
             # 根據車速與車輛計數判斷道路狀況, so far we just check trafic base on speed
             if 0 < carSpeed < 30:
                 trafficData['traffic'] = "JAMMED"
