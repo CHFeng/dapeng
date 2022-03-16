@@ -53,7 +53,7 @@ pip install psycopg2
 ```
 
 ## Pyinstaller
-[參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
+* [參考](https://zh-tw.coderbridge.com/@WeiHaoEric/0b2ced0696cc4c38a62d7b26fa7bbea0)
 
 使用pyinstaller將source code編譯成可執行檔
 
@@ -90,7 +90,7 @@ sudo npm install pm2 -g
 ```
 我們使用ecosystem.config.js來設定要啟動的服務與相關參數
 # 使用pm2-logrotate管理log
-*[參考](https://www.gushiciku.cn/pl/phPM/zh-tw)
+* [參考](https://www.gushiciku.cn/pl/phPM/zh-tw)
 安裝logrotate的模組
 ```
 pm2 install pm2-logrotate
