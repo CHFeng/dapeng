@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database, Record
 
-APP_VERSION = "3.0.1"
+APP_VERSION = "3.0.2"
 WEB_ERROR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
@@ -319,7 +319,7 @@ def get_records(body: CameraRecords):
                 statistics[key][type] = {'inCounter': 0, 'outCounter': 0}
 
             # 累加數據
-            statistics[key][type]['inCounter'] += row['inCounte']
+            statistics[key][type]['inCounter'] += row['inCounter']
             statistics[key][type]['outCounter'] += row['outCounter']
 
         # 轉換資料格式符合需求文件
