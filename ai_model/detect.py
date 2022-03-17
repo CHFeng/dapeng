@@ -469,12 +469,17 @@ class Detect:
         if self.vid is not None:
             raise RuntimeError('camera is already opened!')
         print('RTSP url is: {}'.format(self.rtspUrl))
+        openCount = 0
         while True:
             self.vid = cv2.VideoCapture(self.rtspUrl)
             self._start()
+            openCount += 1
             # check cam is opened, else do it again
             if self.is_opened:
                 break
+            elif openCount > 2:
+                # if open failed over than 2 times, raise exception
+                raise RuntimeError('RTSP url can not be read!')
             else:
                 self.vid.release()
 

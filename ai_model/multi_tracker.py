@@ -70,7 +70,7 @@ def main(_argv):
                     camIds.append(rtsp['origin'])
     except:
         print("Can't not get NVR config from AI_WEB")
-        exit(1)
+        sys.exit()
         # just for test
         # camIds = [
         #     'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0',
@@ -89,8 +89,11 @@ def main(_argv):
     cams = []
     for camId in camIds:
         rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(nvrConfig['account'], nvrConfig['password'], nvrConfig['host'], camId)
-        cam = Detect(rtspUrl, camId, infer, detect_config[camId])
-        cams.append(cam)
+        try:
+            cam = Detect(rtspUrl, camId, infer, detect_config[camId])
+            cams.append(cam)
+        except:
+            print(rtspUrl + " can't be created!")
     # get video ready to save locally if flag is set
     if FLAGS.output:
         # by default VideoCapture returns float instead of int
@@ -117,18 +120,22 @@ def main(_argv):
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            elif key >= ord("1") and key <= ord("8"):
-                camIdx = key - ord("1")
-                if camIdx >= len(camIds):
-                    print("Only {} video sources".format(len(camIds)))
-                    camIdx = len(camIds) - 1
+            elif key >= ord("0") and key <= ord("9"):
+                camIdx = key - ord("0")
+                if camIdx >= len(cams):
+                    print("Only {} video sources".format(len(cams)))
+                    camIdx = len(cams) - 1
         else:
             # trigger read every 30 seconds to make sure thread is running
-            diffTime = dt.now() - start_time
-            if diffTime.seconds >= 30:
-                for cam in cams:
-                    cam.read()
-                start_time = dt.now()
+            try:
+                diffTime = dt.now() - start_time
+                if diffTime.seconds >= 30:
+                    for cam in cams:
+                        cam.read()
+                    start_time = dt.now()
+            except Exception as err:
+                print("Something wrong on threads:" + str(err))
+                break
 
     # release all threads
     for cam in cams:
