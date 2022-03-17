@@ -1,9 +1,13 @@
+import imp
+
+import sys
 import cv2
 import random
 import colorsys
 import numpy as np
 import tensorflow as tf
 from core.config import cfg
+
 
 def load_freeze_layer(model='yolov4', tiny=False):
     if tiny:
@@ -17,6 +21,7 @@ def load_freeze_layer(model='yolov4', tiny=False):
         else:
             freeze_layouts = ['conv2d_93', 'conv2d_101', 'conv2d_109']
     return freeze_layouts
+
 
 def load_weights(model, weights_file, model_name='yolov4', is_tiny=False):
     if is_tiny:
@@ -38,8 +43,8 @@ def load_weights(model, weights_file, model_name='yolov4', is_tiny=False):
 
     j = 0
     for i in range(layer_size):
-        conv_layer_name = 'conv2d_%d' %i if i > 0 else 'conv2d'
-        bn_layer_name = 'batch_normalization_%d' %j if j > 0 else 'batch_normalization'
+        conv_layer_name = 'conv2d_%d' % i if i > 0 else 'conv2d'
+        bn_layer_name = 'batch_normalization_%d' % j if j > 0 else 'batch_normalization'
 
         conv_layer = model.get_layer(conv_layer_name)
         filters = conv_layer.filters
@@ -79,6 +84,7 @@ def read_class_names(class_file_name):
             names[ID] = name.strip('\n')
     return names
 
+
 def load_config(FLAGS):
     if FLAGS.tiny:
         STRIDES = np.array(cfg.YOLO.STRIDES_TINY)
@@ -95,6 +101,7 @@ def load_config(FLAGS):
 
     return STRIDES, ANCHORS, NUM_CLASS, XYSCALE
 
+
 def get_anchors(anchors_path, tiny=False):
     anchors = np.array(anchors_path)
     if tiny:
@@ -102,18 +109,19 @@ def get_anchors(anchors_path, tiny=False):
     else:
         return anchors.reshape(3, 3, 2)
 
+
 def image_preprocess(image, target_size, gt_boxes=None):
 
-    ih, iw    = target_size
-    h,  w, _  = image.shape
+    ih, iw = target_size
+    h, w, _ = image.shape
 
-    scale = min(iw/w, ih/h)
-    nw, nh  = int(scale * w), int(scale * h)
+    scale = min(iw / w, ih / h)
+    nw, nh = int(scale * w), int(scale * h)
     image_resized = cv2.resize(image, (nw, nh))
 
     image_paded = np.full(shape=[ih, iw, 3], fill_value=128.0)
-    dw, dh = (iw - nw) // 2, (ih-nh) // 2
-    image_paded[dh:nh+dh, dw:nw+dw, :] = image_resized
+    dw, dh = (iw - nw) // 2, (ih - nh) // 2
+    image_paded[dh:nh + dh, dw:nw + dw, :] = image_resized
     image_paded = image_paded / 255.
 
     if gt_boxes is None:
@@ -123,6 +131,7 @@ def image_preprocess(image, target_size, gt_boxes=None):
         gt_boxes[:, [0, 2]] = gt_boxes[:, [0, 2]] * scale + dw
         gt_boxes[:, [1, 3]] = gt_boxes[:, [1, 3]] * scale + dh
         return image_paded, gt_boxes
+
 
 # helper function to convert bounding boxes from normalized ymin, xmin, ymax, xmax ---> xmin, ymin, xmax, ymax
 def format_boxes(bboxes, image_height, image_width):
@@ -136,7 +145,8 @@ def format_boxes(bboxes, image_height, image_width):
         box[0], box[1], box[2], box[3] = xmin, ymin, width, height
     return bboxes
 
-def draw_bbox(image, bboxes, info = False, show_label=True, classes=read_class_names(cfg.YOLO.CLASSES)):
+
+def draw_bbox(image, bboxes, info=False, show_label=True, classes=read_class_names(cfg.YOLO.CLASSES)):
     num_classes = len(classes)
     image_h, image_w, _ = image.shape
     hsv_tuples = [(1.0 * x / num_classes, 1., 1.) for x in range(num_classes)]
@@ -150,7 +160,7 @@ def draw_bbox(image, bboxes, info = False, show_label=True, classes=read_class_n
     out_boxes, out_scores, out_classes, num_boxes = bboxes
     for i in range(num_boxes):
         if int(out_classes[i]) < 0 or int(out_classes[i]) > num_classes: continue
-        x,y,w,h = out_boxes[i]
+        x, y, w, h = out_boxes[i]
         fontScale = 0.5
         score = out_scores[i]
         class_ind = int(out_classes[i])
@@ -161,17 +171,23 @@ def draw_bbox(image, bboxes, info = False, show_label=True, classes=read_class_n
         cv2.rectangle(image, c1, c2, bbox_color, bbox_thick)
 
         if info:
-            print("Object found: {}, Confidence: {:.2f}, BBox Coords (xmin, ymin, width, height): {}, {}, {}, {} ".format(class_name, score, x, y, w, h))
+            print("Object found: {}, Confidence: {:.2f}, BBox Coords (xmin, ymin, width, height): {}, {}, {}, {} ".format(
+                class_name, score, x, y, w, h))
 
         if show_label:
             bbox_mess = '%s: %.2f' % (class_name, score)
             t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
             c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
-            cv2.rectangle(image, c1, (np.float32(c3[0]), np.float32(c3[1])), bbox_color, -1) #filled
+            cv2.rectangle(image, c1, (np.float32(c3[0]), np.float32(c3[1])), bbox_color, -1)  #filled
 
-            cv2.putText(image, bbox_mess, (c1[0], np.float32(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale, (0, 0, 0), bbox_thick // 2, lineType=cv2.LINE_AA)
+            cv2.putText(image,
+                        bbox_mess, (c1[0], np.float32(c1[1] - 2)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale, (0, 0, 0),
+                        bbox_thick // 2,
+                        lineType=cv2.LINE_AA)
     return image
+
 
 def bbox_iou(bboxes1, bboxes2):
     """
@@ -252,9 +268,7 @@ def bbox_giou(bboxes1, bboxes2):
     iou = tf.math.divide_no_nan(inter_area, union_area)
 
     enclose_left_up = tf.minimum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    enclose_right_down = tf.maximum(
-        bboxes1_coor[..., 2:], bboxes2_coor[..., 2:]
-    )
+    enclose_right_down = tf.maximum(bboxes1_coor[..., 2:], bboxes2_coor[..., 2:])
 
     enclose_section = enclose_right_down - enclose_left_up
     enclose_area = enclose_section[..., 0] * enclose_section[..., 1]
@@ -303,38 +317,27 @@ def bbox_ciou(bboxes1, bboxes2):
     iou = tf.math.divide_no_nan(inter_area, union_area)
 
     enclose_left_up = tf.minimum(bboxes1_coor[..., :2], bboxes2_coor[..., :2])
-    enclose_right_down = tf.maximum(
-        bboxes1_coor[..., 2:], bboxes2_coor[..., 2:]
-    )
+    enclose_right_down = tf.maximum(bboxes1_coor[..., 2:], bboxes2_coor[..., 2:])
 
     enclose_section = enclose_right_down - enclose_left_up
 
-    c_2 = enclose_section[..., 0] ** 2 + enclose_section[..., 1] ** 2
+    c_2 = enclose_section[..., 0]**2 + enclose_section[..., 1]**2
 
     center_diagonal = bboxes2[..., :2] - bboxes1[..., :2]
 
-    rho_2 = center_diagonal[..., 0] ** 2 + center_diagonal[..., 1] ** 2
+    rho_2 = center_diagonal[..., 0]**2 + center_diagonal[..., 1]**2
 
     diou = iou - tf.math.divide_no_nan(rho_2, c_2)
 
-    v = (
-        (
-            tf.math.atan(
-                tf.math.divide_no_nan(bboxes1[..., 2], bboxes1[..., 3])
-            )
-            - tf.math.atan(
-                tf.math.divide_no_nan(bboxes2[..., 2], bboxes2[..., 3])
-            )
-        )
-        * 2
-        / np.pi
-    ) ** 2
+    v = ((tf.math.atan(tf.math.divide_no_nan(bboxes1[..., 2], bboxes1[..., 3])) -
+          tf.math.atan(tf.math.divide_no_nan(bboxes2[..., 2], bboxes2[..., 3]))) * 2 / np.pi)**2
 
     alpha = tf.math.divide_no_nan(v, 1 - iou + v)
 
     ciou = diou - alpha * v
 
     return ciou
+
 
 def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
     """
@@ -354,9 +357,9 @@ def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
             max_ind = np.argmax(cls_bboxes[:, 4])
             best_bbox = cls_bboxes[max_ind]
             best_bboxes.append(best_bbox)
-            cls_bboxes = np.concatenate([cls_bboxes[: max_ind], cls_bboxes[max_ind + 1:]])
+            cls_bboxes = np.concatenate([cls_bboxes[:max_ind], cls_bboxes[max_ind + 1:]])
             iou = bbox_iou(best_bbox[np.newaxis, :4], cls_bboxes[:, :4])
-            weight = np.ones((len(iou),), dtype=np.float32)
+            weight = np.ones((len(iou), ), dtype=np.float32)
 
             assert method in ['nms', 'soft-nms']
 
@@ -365,7 +368,7 @@ def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
                 weight[iou_mask] = 0.0
 
             if method == 'soft-nms':
-                weight = np.exp(-(1.0 * iou ** 2 / sigma))
+                weight = np.exp(-(1.0 * iou**2 / sigma))
 
             cls_bboxes[:, 4] = cls_bboxes[:, 4] * weight
             score_mask = cls_bboxes[:, 4] > 0.
@@ -373,14 +376,21 @@ def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
 
     return best_bboxes
 
+
 def freeze_all(model, frozen=True):
     model.trainable = not frozen
     if isinstance(model, tf.keras.Model):
         for l in model.layers:
             freeze_all(l, frozen)
+
+
 def unfreeze_all(model, frozen=False):
     model.trainable = not frozen
     if isinstance(model, tf.keras.Model):
         for l in model.layers:
             unfreeze_all(l, frozen)
 
+
+def flush_print(msg):
+    print(msg)
+    sys.stdout.flush()

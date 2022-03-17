@@ -39,7 +39,7 @@ isPressCtrlC = False
 def signal_handler(signal_num, frame):
     if signal_num == signal.SIGINT.value:
         global isPressCtrlC
-        print('To Close all threads now!')
+        utils.utils.flush_print('To Close all threads now!')
         isPressCtrlC = True
 
 
@@ -69,7 +69,7 @@ def main(_argv):
                 if rtsp['state'] == 'signal_restored' or rtsp['state'] == 'connected':
                     camIds.append(rtsp['origin'])
     except:
-        print("Can't not get NVR config from AI_WEB")
+        utils.flush_print("Can't not get NVR config from AI_WEB")
         sys.exit()
         # just for test
         # camIds = [
@@ -93,7 +93,7 @@ def main(_argv):
             cam = Detect(rtspUrl, camId, infer, detect_config[camId])
             cams.append(cam)
         except:
-            print(rtspUrl + " can't be created!")
+            utils.flush_print(rtspUrl + " can't be created!")
     # get video ready to save locally if flag is set
     if FLAGS.output:
         # by default VideoCapture returns float instead of int
@@ -105,7 +105,7 @@ def main(_argv):
 
     camIdx = 0
     start_time = dt.now()
-    print("Start detection procedure now!")
+    utils.flush_print("Start detection procedure now!")
     while True:
         if isPressCtrlC: break
         if not FLAGS.dont_show:
@@ -123,7 +123,7 @@ def main(_argv):
             elif key >= ord("0") and key <= ord("9"):
                 camIdx = key - ord("0")
                 if camIdx >= len(cams):
-                    print("Only {} video sources".format(len(cams)))
+                    utils.flush_print("Only {} video sources".format(len(cams)))
                     camIdx = len(cams) - 1
         else:
             # trigger read every 30 seconds to make sure thread is running
@@ -134,7 +134,7 @@ def main(_argv):
                         cam.read()
                     start_time = dt.now()
             except Exception as err:
-                print("Something wrong on threads:" + str(err))
+                utils.flush_print("Something wrong on threads:" + str(err))
                 break
 
     # release all threads

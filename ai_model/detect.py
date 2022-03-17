@@ -37,9 +37,9 @@ def notify_web():
         body = json.dumps({'records': body})
         result = requests.post(WEB_NOTIFY_URL, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
-            print("send notify Err:" + json.loads(result.text))
+            utils.flush_print("send notify Err:" + json.loads(result.text))
     except Exception as err:
-        print("send notify Err:" + str(err))
+        utils.flush_print("send notify Err:" + str(err))
 
 
 def write_into_db(counter, camId, allowed_classes):
@@ -98,11 +98,11 @@ def write_into_db(counter, camId, allowed_classes):
         body = json.dumps({'records': body})
         result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
-            print("send request Err:" + json.loads(result.text))
+            utils.flush_print("send request Err:" + json.loads(result.text))
     except Exception as err:
-        print("write into DB Err:" + str(err))
+        utils.flush_print("write into DB Err:" + str(err))
 
-    print("write camId:{} counter into DB successfully! ".format(camId) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+    utils.flush_print("write camId:{} counter into DB successfully! ".format(camId) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
@@ -116,10 +116,10 @@ def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
     distance = pow((x2 - x1), 2) + pow((y2 - y1), 2)
     distance = pow(distance, 0.5)
     speed = (distance * 0.02) / (frameCount * (1 / 20) * DETECTION_FRAME_RATE) * 3
-    # print(x1, y1, x2, y2, distance, frameCount, speed)
+    # utils.flush_print(x1, y1, x2, y2, distance, frameCount, speed)
     # convert speed from m/s to km/hr
     speed = int(speed / 1000 * 3600)
-    # print("object Speed:{}".format(speed))
+    # utils.flush_print("object Speed:{}".format(speed))
     # if speed over 120, it should be wrong
     return speed if speed < 120 else 0
 
@@ -270,7 +270,7 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                         # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
                         if 'notify' in config and config['notify'] == True:
                             notify_web()
-                        # print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
+                        # utils.flush_print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
         # to append object into array if object doesn't existd
         if not existed:
             obj = {'class': class_name, 'id': track_id, 'y_orig': y_cen, 'x_orig': x_cen, 'direction': "none", 'frameCount': 0, 'speed': 0}
@@ -401,7 +401,7 @@ def sub_process(cam):
         # ret, cam.img_handle = cam.vid.read()
         ret = cam.vid.grab()
         if not ret:
-            print("Error grabbing frame from source! {}".format(cam.rtspUrl))
+            utils.flush_print("Error grabbing frame from source! {}".format(cam.rtspUrl))
             cam.vid.release()
             cam.vid = cv2.VideoCapture(cam.rtspUrl)
             continue
@@ -468,7 +468,7 @@ class Detect:
         """Open camera based on command line arguments."""
         if self.vid is not None:
             raise RuntimeError('camera is already opened!')
-        print('RTSP url is: {}'.format(self.rtspUrl))
+        utils.flush_print('RTSP url is: {}'.format(self.rtspUrl))
         openCount = 0
         while True:
             self.vid = cv2.VideoCapture(self.rtspUrl)
@@ -488,20 +488,20 @@ class Detect:
 
     def _start(self):
         if not self.vid.isOpened():
-            print('Camera: starting while cap is not opened!')
+            utils.flush_print('Camera: starting while cap is not opened!')
             return
 
         # Try to grab the 1st image and determine width and height
         _, self.img_handle = self.vid.read()
         if self.img_handle is None:
-            print('Camera: vid.read() returns no image!')
+            utils.flush_print('Camera: vid.read() returns no image!')
             self.is_opened = False
             return
 
         self.is_opened = True
         self.width = int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print("The width:{} height:{}".format(self.width, self.height))
+        utils.flush_print("The width:{} height:{}".format(self.width, self.height))
         for config in self.detect_configs:
             # 判斷偵測範圍右邊的點是否超過實際影像的寬
             if config['rightUp'][0] > self.width:
@@ -522,7 +522,7 @@ class Detect:
                     config['threshold'] = y_diff_1 // 2
                 else:
                     config['threshold'] = y_diff_2 // 2
-                # print(y_diff_1, y_diff_2, config['threshold'])
+                # utils.flush_print(y_diff_1, y_diff_2, config['threshold'])
             elif config['direction'] == "vertical":
                 # 垂直方向的判定,計算左右兩邊的X間隔距離,使用較小的數值/2為threshold
                 x_diff_1 = abs(config['leftUp'][0] - config['rightUp'][0])
@@ -531,7 +531,7 @@ class Detect:
                     config['threshold'] = x_diff_1 // 2
                 else:
                     config['threshold'] = x_diff_2 // 2
-                # print(x_diff_1, x_diff_2, config['threshold'])
+                # utils.flush_print(x_diff_1, x_diff_2, config['threshold'])
 
         assert not self.thread_running
         self.thread_running = True
@@ -541,7 +541,7 @@ class Detect:
     def _stop(self):
         if self.thread_running:
             self.thread_running = False
-            print('Wait until thread is terminated')
+            utils.flush_print('Wait until thread is terminated')
             self.thread.join()
 
     def read(self):
