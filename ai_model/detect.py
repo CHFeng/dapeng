@@ -447,7 +447,7 @@ class Detect:
         self.camId = camId
         # read in all class names from config
         self.class_names = utils.read_class_names(cfg.YOLO.CLASSES)
-        if args['allow_classes']:
+        if 'allow_classes' in args and args['allow_classes'] != None:
             self.allowed_classes = args['allow_classes'].split(",")
         else:
             self.allowed_classes = ["person", "car", "truck", "bus", "motorbike"]
