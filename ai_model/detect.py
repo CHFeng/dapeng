@@ -450,8 +450,7 @@ class Detect:
         if args['allow_classes']:
             self.allowed_classes = args['allow_classes'].split(",")
         else:
-            # by default allow all classes in .names file
-            self.allowed_classes = list(self.class_names.values())
+            self.allowed_classes = ["person", "car", "truck", "bus", "motorbike"]
         # initialize detect config
         self.detect_configs = args['detect_configs']
         # define some flags

@@ -39,7 +39,7 @@ isPressCtrlC = False
 def signal_handler(signal_num, frame):
     if signal_num == signal.SIGINT.value:
         global isPressCtrlC
-        utils.utils.flush_print('To Close all threads now!')
+        utils.flush_print('To Close all threads now!')
         isPressCtrlC = True
 
 
