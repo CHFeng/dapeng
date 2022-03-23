@@ -124,7 +124,7 @@ class Database:
 
         return data
 
-    def get_record(self, id=None, camId=None, start_time=None, end_time=None, type=None) -> List[Record]:
+    def get_record(self, id=None, camId=None, start_time=None, end_time=None, types=None) -> List[Record]:
         data = []
         query = ''
         if id:
@@ -137,10 +137,17 @@ class Database:
             if query:
                 query += 'AND '
             query += "time >= '{}' AND time < '{}' ".format(start_time, end_time)
-        if type:
+        if types:
             if query:
                 query += 'AND '
-            query += "type='{}' ".format(type)
+            # 組合所需要的type
+            typeStr = "("
+            for type in types:
+                typeStr += "'{}'".format(type)
+                # 如果不是最後一個物件類別,則須加上AND
+                if type != types[-1]:
+                    typeStr += ', '
+            query += "type IN {})".format(typeStr)
 
         query = "SELECT * FROM {} WHERE ".format(RECORD_TABLE_NAME) + query
         self.cursor.execute(query)

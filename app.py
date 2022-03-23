@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from db_postgres import Database, Record
 
-APP_VERSION = "3.0.3"
+APP_VERSION = "5.0.0"
 WEB_ERROR_URL = "http://{server_domain}/api/nvr/error"
 # 建立一個 Fast API application
 app = FastAPI()
@@ -27,6 +27,7 @@ class CameraRecords(BaseModel):
     endTime: int
     apiUrl: str
     eventTypes: str
+    models: List[int]
     type: Optional[str] = 'ALL'
 
 
@@ -199,7 +200,7 @@ def get_records(id: Optional[UUID] = None,
         if not id and not cam_id and not start_time and not end_time and not type:
             rows = db.get_all_records()
         else:
-            rows = db.get_record(id, cam_id, start_time, end_time, type)
+            rows = db.get_record(id, cam_id, start_time, end_time, [type])
 
         data['records'] = rows
         # 統計物件計數數值
@@ -275,6 +276,7 @@ def get_records(body: CameraRecords):
         LOITERING: 電子圍籬
         STOPPED: 違停
         ENTER: 人車量資訊
+    ● models: 辨識模組，1人流，2車流，3停車場(總量)，4停車場(出入口-出)，5停車場(出入口-入)，一個攝影機可能身兼多種任務\n
 
     ● type:\n
         ALL: 全部(列出所有分類)
@@ -307,10 +309,21 @@ def get_records(body: CameraRecords):
         # conver milliseconds to date type
         start_time = dt.fromtimestamp(body.startTime / 1000.0)
         end_time = dt.fromtimestamp(body.endTime / 1000.0)
-        # if type is ALL, remove type query
-        type = body.type
-        if type == 'ALL': type = None
-        rows = db.get_record(start_time=start_time, end_time=end_time, type=type)
+        types = []
+        # 如果指定物件型態不是ALL,加入型態list
+        if body.type != 'ALL': types.append(body.type)
+        if len(body.models) > 0:
+            # 有指定辨識模組
+            for model in body.models:
+                print(model)
+                if model in types: continue
+                elif model == 1: types.append("PEOPLE")
+                elif model == 2:
+                    car_types = ["TRUCK", "PICKUP_TRUCK", "BUS", "AUTOCAR", "MOTORCYCLE", "BIKE", "AMBULANCE", "FIRE_ENGINE", "POLICE_CAR"]
+                    types.extend(car_types)
+                elif model >= 3:
+                    types.append("PARKING_CAR")
+        rows = db.get_record(start_time=start_time, end_time=end_time, types=types)
 
         # 統計物件計數數值
         statistics = {}
@@ -340,6 +353,16 @@ def get_records(body: CameraRecords):
                     'inCounter': statistics[key][objType]['inCounter'],
                     'outCounter': statistics[key][objType]['outCounter']
                 })
+                # 物件型態為PARKING_CAR時的特別處理
+                if objType == "PARKING_CAR":
+                    # 將停車場的物件型態自動改為AUTOCAR
+                    temp['detail'][-1]['type'] = "AUTOCAR"
+                    # 如果有指定model=4,只顯示出場數值
+                    if 4 in body.models:
+                        del temp['detail'][-1]['inCounter']
+                    # 如果有指定model=5,只顯示入場數值
+                    elif 5 in body.models:
+                        del temp['detail'][-1]['outCounter']
             data.append(temp)
     except Exception as err:
         return resp(str(err))
@@ -366,7 +389,7 @@ def get_traffic(camera: str, apiUrl: str, endTime: Optional[int] = int(dt.now().
     data = {'camera': camera, 'traffic': "LIGHT"}
     try:
         # 指定type=AUTOCAR
-        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type='AUTOCAR')
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type=['AUTOCAR'])
         carCounter = 0
         carSpeed = 0
         for row in rows:
@@ -407,7 +430,7 @@ def get_statistics_traffic(camera: str, apiUrl: str, startTime: int, endTime: in
     statisticsList = []
     try:
         # 指定type=AUTOCAR
-        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type='AUTOCAR')
+        rows = db.get_record(camId=camera, start_time=start_time, end_time=end_time, type=['AUTOCAR'])
         # 從取得的資料中判斷每個小時的道路狀況
         start = start_time
         while True:
