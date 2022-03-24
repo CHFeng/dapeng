@@ -9,7 +9,7 @@ dependencies:
   - cudatoolkit==10.1.243
   - pip:
     - tensorflow-gpu
-    - opencv-python==4.1.1.26
+    - opencv-python
     - lxml
     - tqdm
     - absl-py
@@ -20,3 +20,4 @@ dependencies:
     - uvicorn
     - psycopg2
     - requests
+    - pyinstaller
