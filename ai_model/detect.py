@@ -22,24 +22,50 @@ from deep_sort import preprocessing, nn_matching
 from cnn_model.cnn_classify import detect_car_classified
 
 DETECTION_FRAME_RATE = 4
-WEB_NOTIFY_URL = "http://{server_domain}/api/nvr/notify"
+WEB_URL = "DAPENG"
 
 
-def notify_web():
+def send_parking_event(cameraName, direction):
     '''
-    通知思納捷主機有物件進入或離開偵測區域的事件
+    通知思納捷主機有車輛進入或離開停車場的事件
+    cameraName: 攝影機的名稱，相當於"friendlyNameShort"
+    direction: "carIn" or "carOut"
     '''
     # send post request
     try:
         headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
         # 根據API文件設定body內容
-        body = {}
-        body = json.dumps({'records': body})
-        result = requests.post(WEB_NOTIFY_URL, data=body, headers=headers)
+        body = {'cameraName': cameraName, 'eventTime': dt.timestamp(dt.now()) * 1000}
+        body[direction] = 1
+        body = json.dumps(body)
+        url = "http://{}/api/nvr/notify".format(WEB_URL)
+        result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
-            utils.flush_print("send notify Err:" + json.loads(result.text))
+            utils.flush_print("send_parking_event Err:" + json.loads(result.text))
     except Exception as err:
-        utils.flush_print("send notify Err:" + str(err))
+        utils.flush_print("send_parking_event Err:" + str(err))
+
+
+def period_notify(cameraName, carIn, carOut, startTime):
+    '''
+    每分鐘回報攝影機的辨識結果(出與入)列表
+    cameraName: 攝影機的名稱，相當於"friendlyNameShort"
+    carIn: 入車數量
+    carOut: 出車數量
+    startTime: 統計開始時間，時間戳(long time to millisecond)
+    '''
+    # send post request
+    try:
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+        # 根據API文件設定body內容
+        body = {'cameraName': cameraName, 'carIn': carIn, 'carOut': carOut, 'startTime': startTime, 'statsType': 5}
+        body = json.dumps(body)
+        url = "http://{}/api/vehicle/inAndOutStats".format(WEB_URL)
+        result = requests.post(url, data=body, headers=headers)
+        if result.status_code != requests.codes.ok:
+            utils.flush_print("period_notify Err:" + json.loads(result.text))
+    except Exception as err:
+        utils.flush_print("period_notify Err:" + str(err))
 
 
 def write_into_db(counter, camId, allowed_classes):
@@ -216,12 +242,14 @@ def yolov4(cam):
     return detections
 
 
-def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs):
+def check_track_direction(cam, bbox, class_name, track_id, config):
     '''
     偵測物件移動的方向
     如果偵測區間設定為水平(horizontal),則物件往下移動(X變大),則位移方向判定為down
     如果偵測區間設定為垂直(vertical),則物件往右移動(Y變大),則位移方向判定為down
     '''
+    frame = cam.img_handle
+    detect_objs = cam.detect_objs
     # the detection area line
     points = np.array([config['leftUp'], config['leftDown'], config['rightDown'], config['rightUp']], np.int32)
     cv2.polylines(frame, pts=[points], isClosed=True, color=(255, 0, 0), thickness=3)
@@ -267,9 +295,16 @@ def check_track_direction(frame, bbox, class_name, track_id, config, detect_objs
                             left, top, right, bottom = bbox
                             cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
-                        # TODO 通知思納捷主機有物件進入或離開偵測區域的事件
+                        # 通知思納捷主機有物件進入/離開停車場事件,並將class_type改為PARKING_CAR,方便後續讀取
                         if 'notify' in config and config['notify'] == True:
-                            notify_web()
+                            obj['class'] = "PARKING_CAR"
+                            # 判斷物件移動方向up是入停車場或者down是入停車場
+                            eventType = ""
+                            if 'intoParking' in config and config['intoParking'] == "down":
+                                eventType = "carIn" if obj['direction'] == "down" else "carOut"
+                            else:
+                                eventType = "carIn" if obj['direction'] == "up" else "carOut"
+                            send_parking_event(cam.camName, eventType)
                         # utils.flush_print("{}-ID:{} direction:{}".format(class_name, track_id, obj['direction']))
         # to append object into array if object doesn't existd
         if not existed:
@@ -294,7 +329,7 @@ def deep_sort(cam, detections):
         bbox = track.to_tlbr()
         class_name = track.get_class()
         for config in cam.detect_configs:
-            check_track_direction(cam.img_handle, bbox, class_name, track.track_id, config, cam.detect_objs)
+            check_track_direction(cam, bbox, class_name, track.track_id, config)
         # draw bbox on screen, just for debug
         color = colors[int(track.track_id) % len(colors)]
         color = [i * 255 for i in color]
@@ -331,6 +366,8 @@ def counter_object(cam):
     FONT_SCALE = 2
     # the time interval(seconds) to write counter value into DB
     WRITE_DB_INTERVAL = 5 * 60
+    # 停車場車輛進出辨識-週期回報時間
+    PARKING_NOTIFY_INTERVAL = 1 * 60
     # define counter for every objects
     counter = {}
     for name in cam.allowed_classes:
@@ -358,15 +395,17 @@ def counter_object(cam):
         if counter[key] == 0:
             continue
         labelName = key
-        # if cam.flow_direction == "vertical":
-        #     if "up" in key:
-        #         labelName = key.replace("up", "IN")
-        #     elif "down" in key:
-        #         labelName = key.replace("down", "OUT")
         # just for debug, show result on image
         cv2.putText(cam.img_handle, "{}:{}".format(labelName, counter[key]), (cam.width // 3, 35 + idx * 25 * FONT_SCALE), 0, FONT_SCALE, (255, 0, 0),
                     1)
         idx += 1
+    # 停車場車輛進出辨識-週期回報,有PARKING型態的紀錄才回報
+    diffTime = dt.now() - cam.lastNotifyTime
+    if diffTime.seconds >= PARKING_NOTIFY_INTERVAL:
+        # update last time stamp
+        cam.lastNotifyTime = dt.now()
+        if 'PARKING_CAR-up' in counter or 'PARKING_CAR-down' in counter:
+            period_notify(cam.cameraName, counter['PARKING_CAR-up'], counter['PARKING_CAR-down'], dt.timestamp(cam.lastWriteTime) * 1000)
     # wirte data into DB every time inteval
     diffTime = dt.now() - cam.lastWriteTime
     if diffTime.seconds >= WRITE_DB_INTERVAL:
@@ -424,7 +463,7 @@ def sub_process(cam):
 
 
 class Detect:
-    def __init__(self, rtspUrl, camId, infer, args) -> None:
+    def __init__(self, rtspUrl, camInfo, infer, args) -> None:
         # Definition of the parameters
         max_cosine_distance = 0.4
         nn_budget = None
@@ -444,19 +483,23 @@ class Detect:
         self.img_handle = None
         self.width = 0
         self.height = 0
-        self.camId = camId
+        self.camId = camInfo['id']
+        self.camName = camInfo['cameraName']
         # read in all class names from config
         self.class_names = utils.read_class_names(cfg.YOLO.CLASSES)
         if 'allow_classes' in args and args['allow_classes'] != None:
             self.allowed_classes = args['allow_classes'].split(",")
         else:
             self.allowed_classes = ["person", "car", "truck", "bus", "motorbike"]
+        # 停車場車輛的類型
+        self.allowed_classes.append("PARKING_CAR")
         # initialize detect config
         self.detect_configs = args['detect_configs']
         # define some flags
         self.frame_num = 0
         self.detect_objs = []
         self.lastWriteTime = dt.now()
+        self.lastNotifyTime = dt.now()
         self.thread_running = False
         self.is_detected = False
         self.is_opened = False

@@ -26,6 +26,7 @@ from tensorflow.python.saved_model import tag_constants
 import core.utils as utils
 
 YOLOV4_WEIGHTS_PATH = os.path.join(os.getcwd(), "ai_model", "model_data/yolov4-416")
+FETCH_CAMERA_URL = "http://{server_domain}/api/cameraPlan/list"
 flags.DEFINE_string("weights", YOLOV4_WEIGHTS_PATH, "path to weights file")
 flags.DEFINE_boolean("tiny", False, "yolo or yolo-tiny")
 flags.DEFINE_string("model", "yolov4", "yolov3 or yolov4")
@@ -33,6 +34,33 @@ flags.DEFINE_boolean("dont_show", False, "dont show video output")
 flags.DEFINE_string("output", None, "path to output video")
 
 isPressCtrlC = False
+
+
+def fetch_camera_models() -> list:
+    '''
+    向思納捷WEB查詢攝影機所屬辨識模組清單
+    response data format:
+    {
+        "code": "0",
+        "message": "",
+        "data": [
+            {
+                "cameraName": "camera1",
+                "models": [1, 2]
+            }
+        ]
+    }
+    '''
+    try:
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+        result = requests.get(FETCH_CAMERA_URL, headers=headers)
+        if result.status_code != requests.codes.ok:
+            print("send fetch_camera_models Err:" + json.loads(result.text))
+        else:
+            result = json.loads(result.text)
+            return result['data']
+    except Exception as err:
+        print("fetch_camera_models Err:" + str(err))
 
 
 # ctrl+c handler
@@ -52,7 +80,7 @@ def main(_argv):
     saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
     infer = saved_model_loaded.signatures['serving_default']
 
-    camIds = []
+    camInfos = []
     nvrConfig = {'account': 'root', 'password': 'root', 'host': '60.249.33.163'}
     # get NVR config
     try:
@@ -67,30 +95,39 @@ def main(_argv):
             result = json.loads(result.text)
             for rtsp in result['resp']:
                 if rtsp['state'] == 'signal_restored' or rtsp['state'] == 'connected':
-                    camIds.append(rtsp['origin'])
+                    camInfos.append({'id': rtsp['origin'], 'cameraName': rtsp['friendlyNameShort']})
     except:
         utils.flush_print("Can't not get NVR config from AI_WEB")
         sys.exit()
         # just for test
-        # camIds = [
-        #     'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
-        #     'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
+        # camInfos = [
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0', 'cameraName': '攝影機1'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0', 'cameraName': '攝影機2'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0', 'cameraName': '攝影機3'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0', 'cameraName': '攝影機4'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0', 'cameraName': '攝影機5'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0', 'cameraName': '攝影機6'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0', 'cameraName': '攝影機7'},
+        #     {'id':'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0', 'cameraName': '攝影機8'},
         # ]
+    # 查詢攝影機所屬辨識模組清單
+    cameraModes = fetch_camera_models()
     # read video source detect config from json file
     with open(os.path.join(os.getcwd(), "ai_model", "detect_config.json"), 'r') as f:
         detect_config = json.load(f)
     # create AI detect according camara video source
     cams = []
-    for camId in camIds:
-        rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(nvrConfig['account'], nvrConfig['password'], nvrConfig['host'], camId)
+    for camInfo in camInfos:
+        rtspUrl = "rtsp://{}:{}@{}:554/hosts/{}".format(nvrConfig['account'], nvrConfig['password'], nvrConfig['host'], camInfo['id'])
+        # 比對思納捷回傳的攝影機模組型態,來調整detect_config中notify的數值是否修改
+        for cameraMode in cameraModes:
+            if cameraMode['cameraName'] == camInfo['cameraName']:
+                # 如果該攝影機的modes包含了3,4,5則表示為停車場攝影機,需要主動通知思納捷
+                if any(a in cameraMode['models'] for a in (3, 4, 5)):
+                    for config in detect_config[camInfo['id']]['detect_configs']:
+                        config['notify'] = True
         try:
-            cam = Detect(rtspUrl, camId, infer, detect_config[camId])
+            cam = Detect(rtspUrl, camInfo, infer, detect_config[camInfo['id']])
             cams.append(cam)
         except:
             utils.flush_print(rtspUrl + " can't be created!")

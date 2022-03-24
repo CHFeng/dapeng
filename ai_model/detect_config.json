@@ -7,14 +7,16 @@
             "leftDown": [2120, 1200],
             "rightUp": [2480, 600],
             "rightDown":[2180, 1200],
-            "notify": false
+            "notify": false,
+            "intoParking": "up"
         },{
             "direction":"horizontal",
             "leftUp": [320, 630],
             "leftDown": [320, 1060],
             "rightUp": [1480, 630],
             "rightDown":[1480, 1060],
-            "notify": false
+            "notify": false,
+            "intoParking": "down"
         }]
     },
     "DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0":{
