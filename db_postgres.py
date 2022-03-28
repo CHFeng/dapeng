@@ -137,7 +137,7 @@ class Database:
             if query:
                 query += 'AND '
             query += "time >= '{}' AND time < '{}' ".format(start_time, end_time)
-        if types:
+        if types and len(types) > 0:
             if query:
                 query += 'AND '
             # 組合所需要的type

@@ -55,12 +55,13 @@ def fetch_camera_models() -> list:
         headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
         result = requests.get(FETCH_CAMERA_URL, headers=headers)
         if result.status_code != requests.codes.ok:
-            print("send fetch_camera_models Err:" + json.loads(result.text))
+            utils.flush_print("send fetch_camera_models Err:" + json.loads(result.text))
         else:
             result = json.loads(result.text)
             return result['data']
     except Exception as err:
-        print("fetch_camera_models Err:" + str(err))
+        utils.flush_print("fetch_camera_models Err:" + str(err))
+        return []
 
 
 # ctrl+c handler
@@ -101,16 +102,40 @@ def main(_argv):
         sys.exit()
         # just for test
         # camInfos = [
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0', 'cameraName': '攝影機1'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0', 'cameraName': '攝影機2'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0', 'cameraName': '攝影機3'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0', 'cameraName': '攝影機4'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0', 'cameraName': '攝影機5'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0', 'cameraName': '攝影機6'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0', 'cameraName': '攝影機7'},
-        #     {'id':'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0', 'cameraName': '攝影機8'},
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.101/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機1'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.102/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機2'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.103/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機3'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.104/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機4'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.105/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機5'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.106/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機6'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.107/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機7'
+        #     },
+        #     {
+        #         'id': 'DESKTOP-F093S18/DeviceIpint.108/SourceEndpoint.video:0:0',
+        #         'cameraName': '攝影機8'
+        #     },
         # ]
-    # 查詢攝影機所屬辨識模組清單
+    # 向思納捷WEB查詢攝影機所屬辨識模組清單
     cameraModes = fetch_camera_models()
     # read video source detect config from json file
     with open(os.path.join(os.getcwd(), "ai_model", "detect_config.json"), 'r') as f:

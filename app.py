@@ -200,7 +200,8 @@ def get_records(id: Optional[UUID] = None,
         if not id and not cam_id and not start_time and not end_time and not type:
             rows = db.get_all_records()
         else:
-            rows = db.get_record(id, cam_id, start_time, end_time, [type])
+            types = None if type is None else [type]
+            rows = db.get_record(id, cam_id, start_time, end_time, types)
 
         data['records'] = rows
         # 統計物件計數數值
@@ -321,7 +322,7 @@ def get_records(body: CameraRecords):
                 elif model == 2:
                     car_types = ["TRUCK", "PICKUP_TRUCK", "BUS", "AUTOCAR", "MOTORCYCLE", "BIKE", "AMBULANCE", "FIRE_ENGINE", "POLICE_CAR"]
                     types.extend(car_types)
-                elif model >= 3:
+                elif model >= 3 and "PARKING_CAR" not in types:
                     types.append("PARKING_CAR")
         rows = db.get_record(start_time=start_time, end_time=end_time, types=types)
 
@@ -357,12 +358,13 @@ def get_records(body: CameraRecords):
                 if objType == "PARKING_CAR":
                     # 將停車場的物件型態自動改為AUTOCAR
                     temp['detail'][-1]['type'] = "AUTOCAR"
-                    # 如果有指定model=4,只顯示出場數值
-                    if 4 in body.models:
-                        del temp['detail'][-1]['inCounter']
-                    # 如果有指定model=5,只顯示入場數值
-                    elif 5 in body.models:
-                        del temp['detail'][-1]['outCounter']
+                    if len(body.models) == 1:
+                        # 如果只有指定model=4,只顯示出場數值
+                        if 4 in body.models:
+                            del temp['detail'][-1]['inCounter']
+                        # 如果只有指定model=5,只顯示入場數值
+                        elif 5 in body.models:
+                            del temp['detail'][-1]['outCounter']
             data.append(temp)
     except Exception as err:
         return resp(str(err))

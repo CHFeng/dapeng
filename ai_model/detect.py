@@ -28,7 +28,7 @@ WEB_URL = "DAPENG"
 def send_parking_event(cameraName, direction):
     '''
     通知思納捷主機有車輛進入或離開停車場的事件
-    cameraName: 攝影機的名稱，相當於"friendlyNameShort"
+    cameraName: 攝影機的名稱,相當於"friendlyNameShort"
     direction: "carIn" or "carOut"
     '''
     # send post request
@@ -42,6 +42,7 @@ def send_parking_event(cameraName, direction):
         result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             utils.flush_print("send_parking_event Err:" + json.loads(result.text))
+        utils.flush_print("Send parking event {}-{} to WEB successfully! ".format(cameraName, direction) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
     except Exception as err:
         utils.flush_print("send_parking_event Err:" + str(err))
 
@@ -49,10 +50,10 @@ def send_parking_event(cameraName, direction):
 def period_notify(cameraName, carIn, carOut, startTime):
     '''
     每分鐘回報攝影機的辨識結果(出與入)列表
-    cameraName: 攝影機的名稱，相當於"friendlyNameShort"
+    cameraName: 攝影機的名稱,相當於"friendlyNameShort"
     carIn: 入車數量
     carOut: 出車數量
-    startTime: 統計開始時間，時間戳(long time to millisecond)
+    startTime: 統計開始時間,時間戳(long time to millisecond)
     '''
     # send post request
     try:
@@ -64,6 +65,7 @@ def period_notify(cameraName, carIn, carOut, startTime):
         result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             utils.flush_print("period_notify Err:" + json.loads(result.text))
+        utils.flush_print("Send period notify to WEB successfully! " + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
     except Exception as err:
         utils.flush_print("period_notify Err:" + str(err))
 
@@ -84,7 +86,8 @@ def write_into_db(counter, camId, allowed_classes):
         "ambulance": "AMBULANCE",
         "fire_engine": "FIRE_ENGINE",
         "police_car": "POLICE_CAR",
-        "person": "PEOPLE"
+        "person": "PEOPLE",
+        "parking_car": "PARKING_CAR"
     }
     records = []
     body = []
@@ -125,10 +128,9 @@ def write_into_db(counter, camId, allowed_classes):
         result = requests.post(url, data=body, headers=headers)
         if result.status_code != requests.codes.ok:
             utils.flush_print("send request Err:" + json.loads(result.text))
+        utils.flush_print("write camId:{} counter into DB successfully! ".format(camId) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
     except Exception as err:
         utils.flush_print("write into DB Err:" + str(err))
-
-    utils.flush_print("write camId:{} counter into DB successfully! ".format(camId) + dt.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def calculate_object_move_speed(x1, y1, x2, y2, frameCount):
@@ -245,8 +247,8 @@ def yolov4(cam):
 def check_track_direction(cam, bbox, class_name, track_id, config):
     '''
     偵測物件移動的方向
-    如果偵測區間設定為水平(horizontal),則物件往下移動(X變大),則位移方向判定為down
-    如果偵測區間設定為垂直(vertical),則物件往右移動(Y變大),則位移方向判定為down
+    如果偵測區間設定為水平(horizontal),則物件往下移動(Y變大),則位移方向判定為down
+    如果偵測區間設定為垂直(vertical),則物件往右移動(X變大),則位移方向判定為down
     '''
     frame = cam.img_handle
     detect_objs = cam.detect_objs
@@ -295,9 +297,10 @@ def check_track_direction(cam, bbox, class_name, track_id, config):
                             left, top, right, bottom = bbox
                             cut_img = cv2.cvtColor(frame[int(top):int(bottom), int(left):int(right)], cv2.COLOR_RGB2BGR)
                             class_name = detect_car_classified(cut_img, class_name)
-                        # 通知思納捷主機有物件進入/離開停車場事件,並將class_type改為PARKING_CAR,方便後續讀取
-                        if 'notify' in config and config['notify'] == True:
-                            obj['class'] = "PARKING_CAR"
+                        # 通知思納捷主機有物件進入/離開停車場事件
+                        if class_name == "car" and 'notify' in config and config['notify'] == True:
+                            # 將class_type改為parking_car,方便後續資料的判定
+                            obj['class'] = "parking_car"
                             # 判斷物件移動方向up是入停車場或者down是入停車場
                             eventType = ""
                             if 'intoParking' in config and config['intoParking'] == "down":
@@ -404,8 +407,8 @@ def counter_object(cam):
     if diffTime.seconds >= PARKING_NOTIFY_INTERVAL:
         # update last time stamp
         cam.lastNotifyTime = dt.now()
-        if 'PARKING_CAR-up' in counter or 'PARKING_CAR-down' in counter:
-            period_notify(cam.cameraName, counter['PARKING_CAR-up'], counter['PARKING_CAR-down'], dt.timestamp(cam.lastWriteTime) * 1000)
+        if 'parking_car-up' in counter or 'parking_car-down' in counter:
+            period_notify(cam.camName, counter['parking_car-up'], counter['parking_car-down'], dt.timestamp(cam.lastWriteTime) * 1000)
     # wirte data into DB every time inteval
     diffTime = dt.now() - cam.lastWriteTime
     if diffTime.seconds >= WRITE_DB_INTERVAL:
@@ -492,7 +495,7 @@ class Detect:
         else:
             self.allowed_classes = ["person", "car", "truck", "bus", "motorbike"]
         # 停車場車輛的類型
-        self.allowed_classes.append("PARKING_CAR")
+        self.allowed_classes.append("parking_car")
         # initialize detect config
         self.detect_configs = args['detect_configs']
         # define some flags
