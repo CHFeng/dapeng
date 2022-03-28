@@ -407,7 +407,7 @@ def counter_object(cam):
     if diffTime.seconds >= PARKING_NOTIFY_INTERVAL:
         # update last time stamp
         cam.lastNotifyTime = dt.now()
-        if 'parking_car-up' in counter or 'parking_car-down' in counter:
+        if counter['parking_car-up'] or counter['parking_car-down']:
             period_notify(cam.camName, counter['parking_car-up'], counter['parking_car-down'], dt.timestamp(cam.lastWriteTime) * 1000)
     # wirte data into DB every time inteval
     diffTime = dt.now() - cam.lastWriteTime
